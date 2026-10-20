@@ -1,0 +1,48 @@
+# CI for the public Cook-with-Fond repository (github.com/commahawk/fond-skill).
+# This file lives in fond-mono at apps/skill/.github/workflows/ci.yml, where it is inert,
+# and publish.sh mirrors it to the public repository root. It runs the script's hermetic
+# tests over the synthetic fixtures and the must-not-publish check (skill-distribution,
+# "Public repository and release"). Standard library only: the one install is pytest.
+# 3.9 is the floor of the vendored lint (scripts/fond_dsl/, `graphlib`); 3.8 is the
+# script's own for every command over an export (syntax only, no runner on that version).
+# node 20 is required too (cook-with-fond-authoring decision 8): tests/test_player_engine.py
+# runs the player's ENGINE block under node and FOND_REQUIRE_NODE=1 turns its skip into a
+# failure, so the engine parity, round-trip, reconcile and paste-line checks always run.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  tests:
+    name: Script tests and must-not-publish check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.11", "3.12", "3.14"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - run: python -m pip install --quiet pytest
+
+      - name: Hermetic tests over the synthetic fixtures (the player engine tests under node)
+        run: python -m pytest -q tests/
+        env:
+          FOND_REQUIRE_NODE: "1"
+
+      - name: Must-not-publish check
+        run: python3 tests/test_no_leak.py
+
+      - name: Fresh clone works (no installation step)
+        run: python cook-with-fond/scripts/fond_export.py cook-with-fond/fixtures/sample-export.json plan "Skillet Steak Supper"

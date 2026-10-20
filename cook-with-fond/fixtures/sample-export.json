@@ -1,0 +1,682 @@
+{
+  "export_version": 2,
+  "exportedAt": "2026-10-08T12:00:00+00:00",
+  "profile": {
+    "uid": "fx-user-ana-01",
+    "handle": "ana",
+    "createdAt": "2025-03-01T09:00:00+00:00",
+    "totalCooks": 6,
+    "totalRecipes": 3,
+    "credits": 0,
+    "linkedAnonymousUids": []
+  },
+  "contact": {
+    "email": null,
+    "displayName": null,
+    "phoneNumber": null,
+    "tiktokUsername": null
+  },
+  "authoredRecipes": [
+    {
+      "id": "rcp-steak-01",
+      "linkedFromUid": null,
+      "handle": "skillet-steak-supper-a1b2c3",
+      "authorHandle": "ana",
+      "title": "Skillet Steak Supper",
+      "url": "https://blog.example/skillet-steak-supper",
+      "datePublished": "2026-09-20T18:00:00+00:00",
+      "isPublic": true,
+      "ingredients": [
+        "2 quarts water",
+        "1 tsp cumin seeds",
+        "1 ball flatbread dough",
+        "1 strip steak",
+        "1 cup chicken stock",
+        "1 batch corn cake batter",
+        "1 bunch broccoli rabe, trimmed",
+        "3 carrots, cut into batons"
+      ],
+      "nodes": [
+        {
+          "id": 1,
+          "title": "Preheat the Oven",
+          "text": "Preheat the oven to 325°F.",
+          "time": 15,
+          "until": "Preheat the Oven — 15 min",
+          "dependencies": []
+        },
+        {
+          "id": 2,
+          "title": "Boil the Water",
+          "text": "Bring a large pot of [2 quarts water] to a rolling boil.",
+          "time": 6,
+          "until": null,
+          "dependencies": []
+        },
+        {
+          "id": 3,
+          "title": "Toast the Spices",
+          "text": "Toast the [1 tsp cumin seeds] in a dry skillet until fragrant.",
+          "time": 2,
+          "until": "fragrant",
+          "dependencies": []
+        },
+        {
+          "id": 4,
+          "title": "Rest the Dough",
+          "text": "Rest the [1 ball flatbread dough], 5 minutes, then 10 minutes.",
+          "time": 15,
+          "until": "rested",
+          "dependencies": []
+        },
+        {
+          "id": 5,
+          "title": "Sear the Steak",
+          "text": "Sear the [1 strip steak] in the hot skillet, 2 to 3 minutes per side, flipping once.",
+          "time": 2,
+          "repeat": 2,
+          "until": "seared per side (×2)",
+          "dependencies": [
+            3
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Simmer the Sauce",
+          "text": "Simmer the [1 cup chicken stock] with the pan drippings and the toasted cumin, covered.",
+          "time": 20,
+          "until": "simmered, covered",
+          "dependencies": [
+            5
+          ]
+        },
+        {
+          "id": 7,
+          "title": "Reduce the Glaze",
+          "text": "Simmer, uncovered, until syrupy.",
+          "time": 25,
+          "until": "syrupy",
+          "dependencies": [
+            6
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Cook the Flatbreads",
+          "text": "Cook each flatbread in a dry pan until puffed.",
+          "time": 3,
+          "repeat": 2,
+          "until": "puffed (×2)",
+          "dependencies": [
+            4
+          ]
+        },
+        {
+          "id": 9,
+          "title": "Griddle the Corn Cakes",
+          "text": "Cook each [1 batch corn cake batter] until bubbles form.",
+          "time": 3,
+          "repeat": 3,
+          "until": "bubbles form (×3)",
+          "dependencies": []
+        },
+        {
+          "id": 10,
+          "title": "Blanch the Greens",
+          "text": "Blanch the [1 bunch broccoli rabe, trimmed] in the boiling water and drain.",
+          "time": 2,
+          "until": null,
+          "dependencies": [
+            2
+          ]
+        },
+        {
+          "id": 11,
+          "title": "Roast the Vegetables",
+          "text": "Roast the [3 carrots, cut into batons] on a tray.",
+          "time": 25,
+          "until": "roasted",
+          "dependencies": [
+            1
+          ]
+        },
+        {
+          "id": 12,
+          "title": "Plate the Supper",
+          "text": "Slice the steak, spoon the glaze over it and plate with the flatbreads, corn cakes, greens and carrots.",
+          "time": 3,
+          "until": null,
+          "dependencies": [
+            7,
+            8,
+            9,
+            10,
+            11
+          ]
+        }
+      ],
+      "dsl": "# Skillet Steak Supper\n\n## Preheat the Oven [phase=prep section=sides duration=15 attention_level=none]\nPreheat the oven to 325°F.\n\n## Boil the Water [phase=prep section=greens duration=6 attention_level=low]\nBring a large pot of @water{2 quarts water} to a rolling boil.\n\n## Toast the Spices [phase=prep section=sauce attention_level=high]\nToast the @cumin{1 tsp cumin seeds} in a dry skillet until fragrant, ~toast{2%min}.\n\n## Rest the Dough [phase=prep section=bread attention_level=none]\nRest the @dough{1 ball flatbread dough}, ~rest{5%min, 10%min}.\n\n## Sear the Steak [phase=cook section=main attention_level=high depends_on=[toast-the-spices]]\nSear the @steak{1 strip steak} in the hot skillet, ~per-side{2-3%min × 2}, flipping once.\n\n## Simmer the Sauce [phase=cook section=sauce duration=22 attention_level=low depends_on=[sear-the-steak]]\nSimmer the @stock{1 cup chicken stock} with the pan drippings and the toasted @cumin, covered, ~simmer{20%min}.\n\n## Reduce the Glaze [phase=cook section=sauce duration=10 attention_level=low depends_on=[simmer-the-sauce]]\nSimmer, uncovered, until syrupy, ~simmer{25%min}.\n\n## Cook the Flatbreads [phase=cook section=bread duration=4 attention_level=medium count=2 depends_on=[rest-the-dough]]\nCook each flatbread in a dry pan until puffed, ~cook{3%min}.\n\n## Griddle the Corn Cakes [phase=cook section=sides attention_level=medium count=3]\nCook each @corn-cake{1 batch corn cake batter} until bubbles form, ~cook{3%min}.\n\n## Blanch the Greens [phase=cook section=greens duration=2 attention_level=medium depends_on=[boil-the-water]]\nBlanch the @greens{1 bunch broccoli rabe}(trimmed) in the boiling water and drain.\n\n## Roast the Vegetables [phase=cook section=sides duration=25 attention_level=none depends_on=[preheat-the-oven]]\nRoast the @carrots{3 carrots}(cut into batons) on a tray, ~roast{25%min}.\n\n## Plate the Supper [phase=serve section=main duration=3 attention_level=full depends_on=[reduce-the-glaze, cook-the-flatbreads, griddle-the-corn-cakes, blanch-the-greens, roast-the-vegetables]]\nSlice the steak, spoon the glaze over it and plate with the flatbreads, corn cakes, greens and carrots.\n",
+      "sourceAuthor": "Cara",
+      "lineage": {
+        "parentId": "rcp-parent-77",
+        "forkPoint": "v2",
+        "attributionHandles": [
+          "cara",
+          "ben"
+        ]
+      }
+    },
+    {
+      "id": "rcp-pasta-02",
+      "linkedFromUid": null,
+      "handle": "weeknight-garlic-pasta-d4e5f6",
+      "authorHandle": "ana",
+      "title": "Weeknight Garlic Pasta",
+      "url": "https://blog.example/garlic-pasta",
+      "datePublished": "2026-08-15T19:30:00+00:00",
+      "isPublic": true,
+      "ingredients": [
+        "garlic",
+        "300 g spaghetti",
+        "parmesan",
+        "4 tbsp olive oil",
+        "a handful of parsley",
+        "chili flakes",
+        "2 flatbreads",
+        "3 eggs",
+        "water"
+      ],
+      "nodes": [
+        {
+          "id": 7,
+          "title": "Prep: Slice the garlic",
+          "text": "Thinly slice the [garlic].",
+          "time": 2,
+          "until": null,
+          "dependencies": []
+        },
+        {
+          "id": 2,
+          "title": "Prep: Grate the cheese",
+          "text": "Grate the [parmesan] and set it aside.",
+          "time": 0,
+          "until": null,
+          "dependencies": []
+        },
+        {
+          "id": 5,
+          "title": "Boil the water",
+          "text": "Bring a large pot of [water] to a boil and salt it well.",
+          "time": 0,
+          "until": "the water is at a rolling boil",
+          "dependencies": []
+        },
+        {
+          "id": 9,
+          "title": "Cook the pasta",
+          "text": "Drop the [spaghetti] in and stir once.",
+          "time": 12,
+          "until": "al dente",
+          "dependencies": [
+            5
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Sizzle the garlic",
+          "text": "Warm the [olive oil] with the sliced garlic over low heat.",
+          "time": 0.5,
+          "until": "fragrant",
+          "dependencies": [
+            7
+          ]
+        },
+        {
+          "id": 8,
+          "title": "Toss the pasta",
+          "text": "Toss the drained pasta with the oil, the [parsley] and a pinch of [chili flakes].",
+          "time": 8,
+          "until": null,
+          "dependencies": [
+            9,
+            4
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Puff the flatbreads",
+          "text": "Toast each [flatbread] in a dry pan until puffed.",
+          "time": 1,
+          "repeat": 2,
+          "until": "puffed (×2)",
+          "dependencies": []
+        },
+        {
+          "id": 6,
+          "title": "Fry the eggs",
+          "text": "Fry the [eggs] one at a time in the garlic oil.",
+          "time": 2,
+          "repeat": 3,
+          "until": null,
+          "dependencies": [
+            4
+          ]
+        },
+        {
+          "id": 10,
+          "title": "Serve",
+          "text": "Plate the pasta with the cheese, a flatbread and an egg each.",
+          "time": 0,
+          "until": null,
+          "dependencies": [
+            8,
+            3,
+            6,
+            2
+          ]
+        }
+      ],
+      "dsl": null,
+      "sourceAuthor": null,
+      "lineage": null
+    },
+    {
+      "id": "rcp-toast-03",
+      "linkedFromUid": null,
+      "handle": "toast-soldiers-g7h8i9",
+      "authorHandle": null,
+      "title": "Toast Soldiers",
+      "url": null,
+      "datePublished": "2026-07-01T08:00:00+00:00",
+      "isPublic": false,
+      "ingredients": [
+        "2 slices bread",
+        "1 egg",
+        "butter"
+      ],
+      "nodes": [
+        {
+          "id": 1,
+          "title": "Toast the bread",
+          "text": "Toast the [bread] under the grill.",
+          "time": 3,
+          "until": "golden",
+          "dependencies": []
+        },
+        {
+          "id": 2,
+          "title": "Boil the egg",
+          "text": "Lower the [egg] into boiling water.",
+          "time": 6,
+          "until": "set but runny",
+          "dependencies": []
+        },
+        {
+          "id": 3,
+          "title": "Serve",
+          "text": "Butter the toast with the [butter], cut it into soldiers and serve with the egg.",
+          "time": 1,
+          "until": null,
+          "dependencies": [
+            1,
+            2
+          ]
+        }
+      ],
+      "dsl": null,
+      "sourceAuthor": null,
+      "lineage": null
+    },
+    {
+      "id": "rcp-rice-09",
+      "linkedFromUid": null,
+      "handle": "steamed-coconut-rice-w4x5y6",
+      "authorHandle": "ana",
+      "title": "Steamed Coconut Rice",
+      "url": "https://blog.example/coconut-rice",
+      "datePublished": "2026-06-10T10:00:00+00:00",
+      "isPublic": true,
+      "ingredients": [
+        "1 cup jasmine rice",
+        "1/2 cup coconut flakes",
+        "1 cup coconut milk",
+        "1 cup water",
+        "salt"
+      ],
+      "nodes": [
+        {
+          "id": 1,
+          "title": "Rinse the Rice",
+          "text": "Rinse the [1 cup jasmine rice] under cold water until it runs clear.",
+          "time": 3,
+          "until": null,
+          "dependencies": []
+        },
+        {
+          "id": 2,
+          "title": "Toast the Coconut",
+          "text": "Toast the [1/2 cup coconut flakes] in a dry pan, one batch at a time, until golden.",
+          "time": 2,
+          "repeat": 2,
+          "until": "golden (×2)",
+          "dependencies": []
+        },
+        {
+          "id": 3,
+          "title": "Warm the Coconut Milk",
+          "text": "Warm the [1 cup coconut milk] with [1 cup water] and a pinch of [salt] until it steams.",
+          "time": 5,
+          "until": null,
+          "dependencies": []
+        },
+        {
+          "id": 4,
+          "title": "Simmer the Rice",
+          "text": "Add the rice, cover, and simmer over the lowest heat until the liquid is absorbed.",
+          "time": 15,
+          "until": "the liquid is absorbed",
+          "dependencies": [
+            1,
+            3
+          ]
+        },
+        {
+          "id": 5,
+          "title": "Rest the Rice",
+          "text": "Take the pot off the heat and let it rest, covered.",
+          "time": 10,
+          "until": null,
+          "dependencies": [
+            4
+          ]
+        },
+        {
+          "id": 6,
+          "title": "Fluff and Serve",
+          "text": "Fluff the rice with a fork, scatter the toasted coconut over it and serve.",
+          "time": 2,
+          "until": null,
+          "dependencies": [
+            5,
+            2
+          ]
+        }
+      ],
+      "dsl": "# Steamed Coconut Rice\n\n## Rinse the Rice [phase=prep section=main duration=3 attention_level=high]\nRinse the @rice{1 cup jasmine rice} under cold water until it runs clear.\n\n## Toast the Coconut [phase=prep section=topping duration=2 attention_level=high count=2]\nToast the @coconut{1/2 cup coconut flakes} in a dry pan, one batch at a time, until golden.\n\n## Warm the Coconut Milk [phase=prep section=main duration=5 attention_level=low]\nWarm the @coconut-milk{1 cup coconut milk} with @water{1 cup water} and a pinch of @salt{salt} until it steams.\n\n## Simmer the Rice [phase=cook section=main duration=15 attention_level=none depends_on=[rinse-the-rice, warm-the-coconut-milk]]\nAdd the rice, cover, and simmer over the lowest heat until the liquid is absorbed.\n\n## Rest the Rice [phase=cook section=main duration=10 attention_level=none depends_on=[simmer-the-rice]]\nTake the pot off the heat and let it rest, covered.\n\n## Fluff and Serve [phase=serve section=main duration=2 attention_level=full depends_on=[rest-the-rice, toast-the-coconut]]\nFluff the rice with a fork, scatter the toasted coconut over it and serve.\n",
+      "sourceAuthor": null,
+      "lineage": null
+    }
+  ],
+  "savedRecipes": [
+    {
+      "id": "rcp-soup-05",
+      "linkedFromUid": null,
+      "title": "Tomato Soup",
+      "handle": "soup-xyz789",
+      "authorHandle": "ben",
+      "reason": "url",
+      "savedAt": "2026-09-10T08:30:00+00:00",
+      "cookCount": 1,
+      "deleted": false,
+      "url": "https://blog.example/soup",
+      "ingredients": [
+        "1 onion",
+        "2 tbsp butter",
+        "1 can tomatoes",
+        "2 cups stock",
+        "salt"
+      ],
+      "nodes": [
+        {
+          "id": 1,
+          "title": "Prep: Dice the onion",
+          "text": "Dice the [onion].",
+          "time": 3,
+          "until": null,
+          "dependencies": []
+        },
+        {
+          "id": 2,
+          "title": "Sweat the onion",
+          "text": "Melt the [butter] and sweat the onion until soft.",
+          "time": 5,
+          "until": null,
+          "dependencies": [
+            1
+          ]
+        },
+        {
+          "id": 3,
+          "title": "Simmer the soup",
+          "text": "Add the [tomatoes] and the [stock]; simmer.",
+          "time": 20,
+          "until": "thickened and glossy",
+          "dependencies": [
+            2
+          ]
+        },
+        {
+          "id": 4,
+          "title": "Blend and serve",
+          "text": "Blend smooth, season with [salt] and serve.",
+          "time": 3,
+          "until": null,
+          "dependencies": [
+            3
+          ]
+        }
+      ],
+      "dsl": null,
+      "servings": null,
+      "sourceAuthor": null,
+      "lineage": null
+    },
+    {
+      "id": "rcp-stew-06",
+      "linkedFromUid": null,
+      "title": "Grandma's Stew",
+      "handle": "grandmas-stew-k2l3m4",
+      "authorHandle": "ben",
+      "reason": "shared",
+      "savedAt": "2026-08-01T12:00:00+00:00",
+      "cookCount": 1,
+      "deleted": false,
+      "url": "https://blog.example/stew",
+      "ingredients": [],
+      "nodes": null,
+      "dsl": null,
+      "servings": null,
+      "sourceAuthor": null,
+      "lineage": null
+    },
+    {
+      "id": "rcp-pasta-02",
+      "linkedFromUid": null,
+      "title": "Weeknight Garlic Pasta",
+      "handle": "weeknight-garlic-pasta-d4e5f6",
+      "authorHandle": "ana",
+      "reason": "own",
+      "savedAt": "2026-08-16T07:00:00+00:00",
+      "cookCount": 2,
+      "deleted": false,
+      "authoredRecipeRef": "rcp-pasta-02"
+    },
+    {
+      "id": "rcp-old-07",
+      "linkedFromUid": null,
+      "title": "Old Favourite Curry",
+      "handle": "old-favourite-curry-n5o6p7",
+      "authorHandle": "ben",
+      "reason": "cooked",
+      "savedAt": "2026-05-01T12:00:00+00:00",
+      "cookCount": 0,
+      "deleted": true
+    },
+    {
+      "id": "rcp-gone-08",
+      "linkedFromUid": null,
+      "title": null,
+      "handle": null,
+      "authorHandle": null,
+      "reason": "url",
+      "savedAt": "2026-04-01T12:00:00+00:00",
+      "cookCount": 0,
+      "deleted": false
+    }
+  ],
+  "cooks": [
+    {
+      "id": "ck-0006",
+      "linkedFromUid": null,
+      "mealName": "Sunday supper again",
+      "status": "rated",
+      "startedAt": "2026-10-05T17:00:00+00:00",
+      "completedAt": "2026-10-05T18:20:00+00:00",
+      "deleted": true,
+      "recipes": [
+        {
+          "id": "rcp-stew-06",
+          "title": "Grandma's Stew",
+          "isValid": true,
+          "status": "rated",
+          "userOverride": false,
+          "completedAt": "2026-10-05T18:20:00+00:00",
+          "ratings": {
+            "easyFollow": 3,
+            "taste": 2,
+            "wouldCookAgain": 1
+          },
+          "feedback": null
+        }
+      ]
+    },
+    {
+      "id": "ck-0005",
+      "linkedFromUid": null,
+      "mealName": "Soup night",
+      "status": "recorded",
+      "startedAt": "2026-10-01T18:00:00+00:00",
+      "completedAt": "2026-10-01T18:50:00+00:00",
+      "deleted": false,
+      "recipes": [
+        {
+          "id": "rcp-soup-05",
+          "title": "Tomato Soup",
+          "isValid": false,
+          "status": "recorded",
+          "userOverride": true,
+          "completedAt": null,
+          "ratings": {},
+          "feedback": null
+        }
+      ]
+    },
+    {
+      "id": "ck-0004",
+      "linkedFromUid": null,
+      "mealName": "Sunday supper",
+      "status": "rated",
+      "startedAt": "2026-09-28T17:00:00+00:00",
+      "completedAt": "2026-09-28T18:10:00+00:00",
+      "deleted": false,
+      "recipes": [
+        {
+          "id": "rcp-stew-06",
+          "title": "Grandma's Stew",
+          "isValid": true,
+          "status": "rated",
+          "userOverride": false,
+          "completedAt": "2026-09-28T18:10:00+00:00",
+          "ratings": {
+            "easyFollow": 4,
+            "taste": 5,
+            "wouldCookAgain": 5
+          },
+          "feedback": "lovely"
+        }
+      ]
+    },
+    {
+      "id": "ck-0003",
+      "linkedFromUid": null,
+      "mealName": null,
+      "status": "aborted",
+      "startedAt": "2026-09-21T18:00:00+00:00",
+      "completedAt": null,
+      "deleted": false,
+      "recipes": [
+        {
+          "id": "rcp-pasta-02",
+          "title": "Weeknight Garlic Pasta",
+          "isValid": false,
+          "status": null,
+          "userOverride": false,
+          "completedAt": null,
+          "ratings": {},
+          "feedback": null
+        }
+      ]
+    },
+    {
+      "id": "ck-0002",
+      "linkedFromUid": null,
+      "mealName": "Weeknight",
+      "status": "recorded",
+      "startedAt": "2026-09-14T18:00:00+00:00",
+      "completedAt": "2026-09-14T19:00:00+00:00",
+      "deleted": false,
+      "recipes": [
+        {
+          "id": "rcp-soup-05",
+          "title": "Tomato Soup",
+          "isValid": true,
+          "status": "recorded",
+          "userOverride": false,
+          "completedAt": "2026-09-14T18:40:00+00:00",
+          "ratings": {
+            "taste": 4,
+            "wouldCookAgain": 4
+          },
+          "feedback": null
+        },
+        {
+          "id": "rcp-pasta-02",
+          "title": "Weeknight Garlic Pasta",
+          "isValid": true,
+          "status": "recorded",
+          "userOverride": false,
+          "completedAt": "2026-09-14T19:00:00+00:00",
+          "ratings": {
+            "easyFollow": 5,
+            "taste": 4,
+            "wouldCookAgain": 3
+          },
+          "feedback": null
+        }
+      ]
+    },
+    {
+      "id": "ck-0001",
+      "linkedFromUid": null,
+      "mealName": null,
+      "status": "migrated",
+      "startedAt": "2025-06-01T18:00:00+00:00",
+      "completedAt": "2025-06-01T19:00:00+00:00",
+      "deleted": false,
+      "recipes": [
+        {
+          "id": "rcp-pasta-02",
+          "title": "Weeknight Garlic Pasta",
+          "isValid": false,
+          "status": "migrated",
+          "userOverride": false,
+          "completedAt": "2025-06-01T19:00:00+00:00",
+          "ratings": {
+            "easyFollow": 4
+          },
+          "feedback": null
+        }
+      ]
+    }
+  ]
+}

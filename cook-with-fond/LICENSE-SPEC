@@ -1,0 +1,17 @@
+Fond DSL, © 2026 Deglaze Corp., CC BY 4.0
+
+This notice covers one file in this folder: references/dsl-spec.md, the
+published extract (sections 1-8) of the Fond DSL v1 specification.
+
+That file is licensed under the Creative Commons Attribution 4.0 International
+licence (CC BY 4.0). You may share and adapt it for any purpose, including
+commercially, provided you give appropriate credit, link to the licence and
+indicate whether changes were made.
+
+  Licence text:  https://creativecommons.org/licenses/by/4.0/legalcode
+  Summary:       https://creativecommons.org/licenses/by/4.0/
+  Attribution:   "Fond DSL, © 2026 Deglaze Corp., CC BY 4.0"
+
+Everything else in this folder (the skill instructions, scripts, prompts,
+fixtures and the other reference documents) is covered by the MIT licence in
+the LICENSE file next to this one, Copyright (c) 2026 Deglaze Corp.

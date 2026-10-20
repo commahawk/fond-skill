@@ -1,0 +1,1445 @@
+<!-- fond-player built by fond_export.py h=__FOND_H__ id=__FOND_ID__ -->
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>Fond Cook Player</title>
+<!-- cook-with-fond player. MIT License, Copyright (c) 2026 Deglaze Corp. See LICENSE in the skill folder.
+     Built by `fond_export.py … player`: the script fills the `const DATA` line with the recipe payload (serialised
+     HTML-safe, one line) and the first line's marker. Self-contained — no script, stylesheet, font or image is loaded,
+     nothing is sent anywhere. State lives in this browser's storage (fond-player-v2:<recipe id>), in the
+     FOND1 line the cook copies for Claude and, inside claude.ai, in the artifact host's hot-reload snapshot
+     through window.claude.hot — the one host hook this page calls. The ENGINE block between its markers is
+     pure (no DOM); the skill's node tests slice and run it against the script's own `plan`. -->
+<style>
+/* Layout: one-screen cook panel. A sticky title bar, one scrolling column of step tiles
+   (done steps on top, then every unresolved step in latest-start order), and a sticky
+   footer with the serve time. Tokens come from the Fond app's cooking theme. */
+:root {
+  --ground: #F8F4F0;      /* cooking.background: panel body, locked tiles */
+  --surface: #F3EDE7;     /* header, footer, done tiles */
+  --card: #F6F0EB;        /* available and running tiles */
+  --ink: #2A281D;         /* granite */
+  --ink-80: rgba(42, 40, 29, .80);
+  --ink-65: rgba(42, 40, 29, .65);
+  --ink-50: rgba(42, 40, 29, .50);
+  --ink-40: rgba(42, 40, 29, .40);
+  --line: rgba(42, 40, 29, .14);
+  --tomato: #BD2428;      /* primary actions, error text */
+  --on-tomato: #FFFFFF;
+  --btn: #BD2428;         /* primary button fill (white text) */
+  --toast-action: #F1B34D;
+  --basil: #628B19;       /* done check */
+  --basil-50: rgba(98, 139, 25, .50);
+  --oil: #F1B34D;         /* timer accent */
+  --oil-ink: #5A3B00;
+  --recipe: #4E79A7;      /* recipe colour bar (single-recipe cook) */
+  --shadow: 0 1px 2px rgba(42, 40, 29, .16), 0 3px 8px rgba(42, 40, 29, .08);
+  --scrim: rgba(0, 0, 0, .40);
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Roboto Mono", Consolas, monospace;
+  --radius: 12px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #17150F; --surface: #1F1D16; --card: #29261D;
+    --ink: #EFE9DF; --ink-80: rgba(239, 233, 223, .80); --ink-65: rgba(239, 233, 223, .65);
+    --ink-50: rgba(239, 233, 223, .50); --ink-40: rgba(239, 233, 223, .40); --line: rgba(239, 233, 223, .14);
+    --tomato: #E0503F; --on-tomato: #FFFFFF; --basil: #9CC453; --basil-50: rgba(156, 196, 83, .55);
+    --oil: #F1B34D; --oil-ink: #2A1C00; --recipe: #86A9D3; --btn: #C43A2C; --toast-action: #5A3B00;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 3px 8px rgba(0, 0, 0, .3); --scrim: rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #17150F; --surface: #1F1D16; --card: #29261D;
+  --ink: #EFE9DF; --ink-80: rgba(239, 233, 223, .80); --ink-65: rgba(239, 233, 223, .65);
+  --ink-50: rgba(239, 233, 223, .50); --ink-40: rgba(239, 233, 223, .40); --line: rgba(239, 233, 223, .14);
+  --tomato: #E0503F; --on-tomato: #FFFFFF; --basil: #9CC453; --basil-50: rgba(156, 196, 83, .55);
+  --oil: #F1B34D; --oil-ink: #2A1C00; --recipe: #86A9D3; --btn: #C43A2C; --toast-action: #5A3B00;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .5), 0 3px 8px rgba(0, 0, 0, .3); --scrim: rgba(0, 0, 0, .6);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--ground); color: var(--ink); font-family: var(--font-ui);
+  font-size: 16px; line-height: 1.45; -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+button { font: inherit; color: inherit; }
+b { font-weight: 700; }
+.app { height: 100%; max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; }
+.screen { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.scroll { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.pad { padding-inline: 16px; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--ink-65); }
+.small { font-size: 13px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+:focus-visible { outline: 3px solid var(--oil); outline-offset: 2px; }
+.tile__main:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+.tile--run:focus-visible { outline: 3px solid var(--ink); }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+/* Buttons */
+.btn {
+  min-height: 48px; border: 0; border-radius: var(--radius); padding: 0 20px;
+  background: var(--btn); color: var(--on-tomato); font-weight: 600; font-size: 17px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+}
+.btn--quiet { background: transparent; color: var(--ink); border: 1px solid var(--line); font-weight: 500; font-size: 15px; min-height: 40px; padding: 0 14px; }
+.btn--wide { width: 100%; }
+.link { background: none; border: 0; padding: 8px 0; color: var(--ink-80); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-size: 15px; min-height: 44px; }
+
+/* Bars */
+.bar { background: var(--surface); border-bottom: 1px solid var(--line); padding-block: 10px; display: flex; align-items: center; gap: 12px; }
+.bar__title { flex: 1; min-width: 0; }
+.bar__title h1 { font-size: 19px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bar__title p { margin: 2px 0 0; font-size: 12.5px; color: var(--ink-65); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.foot { background: var(--surface); border-top: 1px solid var(--line); padding-block: 10px; display: flex; align-items: center; gap: 12px; }
+.foot__time { flex: 1; min-width: 0; }
+.foot__time strong { font-size: 17px; display: block; }
+.foot__time span { font-size: 12.5px; color: var(--ink-80); }
+
+/* Picker and mise en place */
+.eyebrow { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-65); }
+.intro { padding-block: 24px 8px; display: grid; gap: 8px; }
+.intro h1 { font-size: 26px; line-height: 1.2; }
+.intro p { margin: 0; color: var(--ink-80); max-width: 60ch; }
+.pick { display: grid; gap: 10px; padding-block: 12px 24px; }
+.pick__item {
+  text-align: left; border: 0; background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 0; overflow: hidden; cursor: pointer; display: grid;
+}
+.pick__item::before { content: ""; display: block; height: 4px; background: var(--recipe); }
+.pick__inner { padding: 14px 16px 16px; display: grid; gap: 4px; }
+.pick__name { font-size: 18px; font-weight: 700; line-height: 1.3; }
+.pick__meta { font-size: 13px; color: var(--ink-65); overflow-wrap: anywhere; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 3px; gap: 3px; }
+.seg button { border: 0; background: transparent; border-radius: 999px; padding: 8px 14px; font-size: 14px; cursor: pointer; min-height: 40px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--ground); }
+.setting { display: grid; gap: 8px; padding-block: 8px 20px; border-top: 1px solid var(--line); padding-top: 16px; }
+
+.mise { padding-block: 20px 28px; display: grid; gap: 22px; }
+.prov { display: grid; gap: 4px; }
+.prov h1 { font-size: 24px; line-height: 1.2; }
+.prov p { margin: 0; font-size: 14px; color: var(--ink-80); overflow-wrap: anywhere; white-space: pre-wrap; }
+.section { display: grid; gap: 10px; }
+.section h2 { font-size: 13px; font-family: var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-65); font-weight: 600; }
+.ingr { margin: 0; padding: 0; list-style: none; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.ingr li { padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
+.wave { display: grid; gap: 8px; }
+.wave__item { background: var(--card); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 4px; }
+.wave__item h3 { font-size: 16px; }
+.wave__item p { margin: 0; font-size: 15px; color: var(--ink-80); }
+.note { font-size: 14px; color: var(--ink-80); background: var(--surface); border-radius: var(--radius); padding: 12px 14px; margin: 0; }
+.est { font-size: 17px; margin: 0; }
+
+/* Step tiles */
+.list { padding-block: 10px 40vh; display: grid; gap: 8px; }
+.tile {
+  position: relative; display: block; width: 100%; text-align: left; border: 0; margin: 0;
+  border-radius: var(--radius); overflow: hidden; background: var(--card); color: var(--ink);
+  box-shadow: var(--shadow); padding: 0; cursor: pointer; touch-action: manipulation;
+}
+.tile::before { content: ""; display: block; height: 4px; background: var(--recipe); }
+.tile__main { display: block; width: 100%; text-align: left; background: transparent; border: 0; padding: 0; margin: 0; cursor: pointer; color: inherit; }
+.tile__body { padding: 14px 16px 16px; display: grid; gap: 8px; }
+.tile__head { display: flex; align-items: flex-start; gap: 10px; }
+.tile__title { display: block; flex: 1; min-width: 0; font-size: 19px; line-height: 1.3; font-weight: 700; }
+.tile__text { display: block; margin: 0; font-size: 17px; line-height: 1.5; letter-spacing: .01em; }
+.tile__timing { display: block; margin: 0; font-size: 14px; color: var(--ink-65); }
+.ico { width: 24px; height: 24px; flex: none; fill: currentColor; }
+.ico--sm { width: 18px; height: 18px; }
+.tile--avail .ico { color: var(--ink); }
+
+.tile--done { background: var(--surface); box-shadow: none; cursor: default; }
+.tile--done::before { opacity: .7; }
+.tile--done .tile__body { padding: 10px 16px 12px; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; display: grid; }
+.tile--done .ico { color: var(--basil-50); }
+.tile--done .tile__title { font-size: 16px; font-weight: 500; color: var(--ink-50); text-decoration: line-through; }
+.tile--done .mono { font-size: 12.5px; color: var(--ink-50); }
+
+.tile--locked { background: var(--ground); box-shadow: 0 0 0 1px var(--line) inset; cursor: default; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.tile--locked::before { opacity: .7; }
+.tile--locked .tile__body { padding: 11px 16px 13px; gap: 6px; }
+.tile--locked .tile__head { align-items: center; }
+.tile--locked .tile__title { font-size: 16px; font-weight: 500; color: var(--ink-65); }
+.tile--locked .ico { color: var(--ink-40); }
+.tile--locked .peek { display: none; margin: 0; font-size: 15px; line-height: 1.45; color: var(--ink-80); }
+.tile--locked.is-peek { background: var(--card); }
+.tile--locked.is-peek .tile__title, .tile--locked.is-peek .ico { color: var(--ink); }
+.tile--locked.is-peek .peek { display: block; }
+
+.tile--held { background: var(--ground); box-shadow: 0 0 0 1px var(--line) inset; cursor: default; }
+.tile--held .tile__title { color: var(--ink-65); font-size: 17px; }
+.tile--held .tile__text { color: var(--ink-65); font-size: 15px; }
+.held-tag { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-80); background: var(--surface); border-radius: 999px; padding: 5px 10px; justify-self: start; }
+
+.tile--run { box-shadow: var(--shadow), 0 0 0 2px var(--oil) inset; }
+.tile--run .tile__body { gap: 6px; }
+.run__title { display: block; font-size: 14px; font-weight: 600; color: var(--ink-80); }
+.run__count { display: block; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 44px; line-height: 1.1; font-weight: 500; letter-spacing: -.01em; }
+.run__meta { display: block; font-size: 14px; color: var(--ink-80); }
+.run__cue { display: block; font-size: 16px; }
+.run__next { display: inline-block; font-size: 15px; font-weight: 600; background: var(--oil); color: var(--oil-ink); border-radius: 8px; padding: 8px 10px; justify-self: start; }
+.is-rung .run__count { color: var(--ink-50); animation: blink 1s steps(1, end) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .is-rung .run__count { animation: none; } }
+.phases { display: flex; gap: 6px; flex-wrap: wrap; }
+.phases span { font-family: var(--font-mono); font-size: 12px; padding: 3px 8px; border-radius: 999px; background: var(--surface); color: var(--ink-65); }
+.phases span.is-now { background: var(--ink); color: var(--ground); }
+.phases span.is-past { text-decoration: line-through; }
+
+.finish { background: var(--card); border-radius: var(--radius); padding: 18px 16px; display: grid; gap: 8px; box-shadow: var(--shadow); }
+.finish h2 { font-size: 20px; }
+.finish p { margin: 0; color: var(--ink-80); }
+
+/* Sheet and toast */
+.sheet-wrap { position: fixed; inset: 0; background: var(--scrim); display: flex; align-items: flex-end; justify-content: center; z-index: 20; }
+.sheet {
+  background: var(--ground); width: 100%; max-width: 640px; max-height: 88%; overflow-y: auto;
+  border-radius: 16px 16px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 18px;
+}
+.sheet h2 { font-size: 18px; }
+.sheet h3 { font-size: 14px; font-family: var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-65); }
+.sheet p { margin: 0; font-size: 14.5px; color: var(--ink-80); }
+.sheet__row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.codebox {
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.5; background: var(--surface); color: var(--ink);
+  border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere;
+  user-select: all; -webkit-user-select: all; margin: 0;
+}
+textarea.codebox { font-size: 16px; width: 100%; min-height: 76px; resize: vertical; user-select: text; -webkit-user-select: text; }
+.check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 15px; }
+.check input { width: 22px; height: 22px; accent-color: var(--tomato); }
+.report { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 13.5px; }
+.report li { display: flex; justify-content: space-between; gap: 12px; border-bottom: 1px solid var(--line); padding: 6px 0; }
+.report li span:last-child { font-family: var(--font-mono); text-align: right; color: var(--ink-80); }
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px));
+  background: var(--ink); color: var(--ground); border-radius: 12px; padding: 10px 10px 10px 16px; display: flex; align-items: center; gap: 12px;
+  width: max-content; max-width: min(92%, 560px); z-index: 30; box-shadow: 0 6px 20px rgba(0, 0, 0, .25); font-size: 15px;
+}
+.toast button { background: transparent; border: 0; color: var(--toast-action); font-weight: 700; padding: 8px 10px; min-height: 40px; cursor: pointer; }
+.err { color: var(--tomato); font-size: 14px; margin: 0; }
+</style>
+
+<div class="app" id="app">
+  <section class="screen" id="screen-pick">
+    <div class="scroll pad">
+      <div class="intro">
+        <span class="eyebrow">Fond · cook player</span>
+        <h1>Pick a recipe to cook</h1>
+        <p>Built by the Cook with Fond skill from your export or a recipe file you keep. This page loads nothing from the network and sends nothing; progress is kept in this browser and in the line you copy for Claude.</p>
+      </div>
+      <div class="pick" id="pick-list"></div>
+      <div class="setting">
+        <span class="eyebrow">Timer speed</span>
+        <div class="seg" role="group" aria-label="Timer speed">
+          <button type="button" id="speed-real" aria-pressed="true">Real time</button>
+          <button type="button" id="speed-fast" aria-pressed="false">Fast: 1 min = 2 s</button>
+        </div>
+        <p class="muted small">Fast mode runs a whole cook in a few minutes, to try the page. It applies when you start a recipe.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-mise" hidden>
+    <div class="bar pad">
+      <button class="link" type="button" id="mise-back">Recipes</button>
+    </div>
+    <div class="scroll pad">
+      <div class="mise" id="mise-body"></div>
+    </div>
+    <div class="foot pad">
+      <button class="btn btn--wide" type="button" id="mise-start">Ready, start cooking</button>
+    </div>
+  </section>
+
+  <section class="screen" id="screen-cook" hidden>
+    <div class="bar pad">
+      <div class="bar__title"><h1 id="cook-title"></h1><p id="cook-byline"></p></div>
+      <button class="btn btn--quiet" type="button" id="cook-menu">More</button>
+    </div>
+    <div class="scroll pad" id="cook-scroll">
+      <div class="list" id="cook-list"></div>
+    </div>
+    <div class="foot pad">
+      <div class="foot__time" aria-live="off"><strong class="mono" id="foot-serve"></strong><span id="foot-left"></span></div>
+      <button class="btn btn--quiet" type="button" id="cook-sync">Tell Claude</button>
+    </div>
+  </section>
+</div>
+<div id="layer"></div>
+<div class="sr-only" id="sr-status" role="status" aria-live="polite"></div>
+<div class="toast" id="toast" hidden><span id="toast-text"></span><button type="button" id="toast-undo">Undo</button></div>
+
+<script>
+const DATA = __FOND_PAYLOAD__;
+
+// ===== ENGINE START — pure functions, no DOM; the tests run this block in node =====
+const FondEngine = (function () {
+  const EPS = 1e-9;
+  const H_RE = /^[0-9a-f]{8}$/;
+
+  function index(recipe) {
+    if (!recipe._index) {
+      const m = {};
+      for (const s of recipe.steps) m[s.id] = s;
+      Object.defineProperty(recipe, "_index", { value: m, enumerable: false });
+    }
+    return recipe._index;
+  }
+  const byRank = (a, b) => a.rank - b.rank;
+  // A timer step is one the payload gave countdown phases (the `~timer{}` sigil or the
+  // legacy `until` + `time`); `segs` is the number of phases in one iteration.
+  const isTimer = s => !!s && s.kind === "timer" && Array.isArray(s.phases) && s.phases.length > 0;
+  const segsOf = s => Math.max(1, (s.segs | 0) || (Array.isArray(s.phases) ? s.phases.length : 1));
+
+  // Same output as fond_export.fmt_minutes.
+  function fmtMinutes(m) {
+    if (m <= 0) return "0 min";
+    if (m < 1) return Math.round(m * 60) + " seconds";
+    if (Math.abs(m - Math.round(m)) < 1e-6) {
+      const whole = Math.round(m);
+      if (whole >= 60) {
+        const h = Math.floor(whole / 60), r = whole % 60;
+        return r === 0 ? h + " hr" : h + " hr " + r + " min";
+      }
+      return whole + " min";
+    }
+    return (+m.toPrecision(6)) + " min";
+  }
+
+  function prerequisites(recipe, sid) {
+    const map = index(recipe), seen = new Set(), stack = [...map[sid].deps];
+    while (stack.length) {
+      const d = stack.pop();
+      if (seen.has(d) || !map[d]) continue;
+      seen.add(d);
+      stack.push(...map[d].deps);
+    }
+    return seen;
+  }
+
+  // implied_done: every resolved id plus the whole prerequisite chain of every resolved
+  // and running id.
+  function closure(recipe, doneIds, runIds) {
+    const out = new Set(doneIds);
+    for (const sid of [...doneIds, ...runIds]) for (const p of prerequisites(recipe, sid)) out.add(p);
+    return out;
+  }
+
+  // Mirrors cmd_plan: available (offerable), held, held_by, locked. `runN` is a Map
+  // id -> whole minutes left, in the order the steps were started.
+  function derive(recipe, done, runN) {
+    const map = index(recipe);
+    const open = recipe.steps.filter(s => !done.has(s.id) && !runN.has(s.id));
+    const avail = open.filter(s => s.deps.every(d => done.has(d))).sort(byRank);
+    const occupiers = [...runN.keys()].filter(id => map[id].occupies);
+    const held = occupiers.length ? avail.filter(s => s.occupies) : [];
+    const heldIds = new Set(held.map(s => s.id));
+    const availIds = new Set(avail.map(s => s.id));
+    return {
+      available: avail.filter(s => !heldIds.has(s.id)).map(s => s.id),
+      held: held.map(s => s.id),
+      heldBy: held.length ? occupiers : [],
+      locked: open.filter(s => !availIds.has(s.id)).sort(byRank).map(s => s.id),
+    };
+  }
+
+  // Mirrors fond_export.simulate: zero-time steps resolve at once, non-occupying steps run
+  // in parallel, one occupying step at a time picked by latest start (the static rank).
+  function simulate(recipe, done, runN) {
+    const map = index(recipe);
+    const resolved = new Set(done), timers = new Map(), active = new Map();
+    for (const [sid, rem] of runN) {
+      if (rem <= 0) resolved.add(sid);
+      else if (map[sid].occupies) active.set(sid, rem);
+      else timers.set(sid, rem);
+    }
+    let pending = recipe.steps.filter(s => !resolved.has(s.id) && !runN.has(s.id));
+    let t = 0, guard = 0;
+    while (pending.length || timers.size || active.size) {
+      if (++guard > 100000) break;
+      let avail;
+      for (;;) {
+        avail = pending.filter(s => s.deps.every(d => resolved.has(d)));
+        const instant = avail.filter(s => s.scheduled <= 0);
+        if (!instant.length) break;
+        for (const s of instant) resolved.add(s.id);
+        pending = pending.filter(s => !resolved.has(s.id));
+      }
+      for (const s of avail.filter(s => !s.occupies)) timers.set(s.id, t + s.scheduled);
+      pending = pending.filter(s => !timers.has(s.id));
+      if (!active.size) {
+        const cands = avail.filter(s => s.occupies);
+        if (cands.length) {
+          const pick = cands.reduce((a, b) => (b.rank < a.rank ? b : a));
+          active.set(pick.id, t + pick.scheduled);
+          pending = pending.filter(s => s.id !== pick.id);
+        }
+      }
+      if (!active.size && !timers.size) break;
+      t = Math.min(...active.values(), ...timers.values());
+      for (const [k, v] of [...active]) if (v <= t + EPS) { active.delete(k); resolved.add(k); }
+      for (const [k, v] of [...timers]) if (v <= t + EPS) { timers.delete(k); resolved.add(k); }
+    }
+    return t;
+  }
+
+  // A run entry is {p, started, started0, n, s}: the phase index, when that phase started,
+  // when the current iteration's first phase started, and the phase count and phases per
+  // iteration the step had when the run began (reconcile reads them after an edit).
+  function phaseState(step, rs, now, mpm) {
+    const ph = step.phases;
+    const cur = ph[rs.p];
+    const end = rs.started + cur.min * mpm;
+    const leftMs = end - now;
+    const lastOfIter = rs.p + 1 >= ph.length || ph[rs.p + 1].iter !== cur.iter;
+    const surplus = step.surplus || 0;
+    const surplusEnd = end + surplus * mpm;
+    return {
+      ph, cur, end, leftMs, rung: leftMs <= 0, last: rs.p >= ph.length - 1,
+      lastOfIter, surplus, surplusLeftMs: lastOfIter && surplus > EPS ? surplusEnd - now : 0,
+      next: rs.p + 1 < ph.length ? ph[rs.p + 1] : null,
+    };
+  }
+
+  // The integer `plan --running <id>=N` takes (SKILL.md "How long to go?"): the current
+  // countdown's minutes left (a sub-minute remainder counts 1 until it rings) + unstarted
+  // segments of this iteration in full + this iteration's surplus (only what is left of it
+  // once the iteration's last segment has rung) + every unstarted iteration in full.
+  function minutesLeft(step, rs, now, mpm) {
+    const st = phaseState(step, rs, now, mpm);
+    let n = st.leftMs > 0 ? Math.ceil(st.leftMs / mpm - EPS) : 0;
+    for (let i = rs.p + 1; i < st.ph.length && st.ph[i].iter === st.cur.iter; i++) n += st.ph[i].min;
+    if (st.surplus > EPS) {
+      if (st.lastOfIter && st.rung) n += st.surplusLeftMs > 0 ? Math.ceil(st.surplusLeftMs / mpm - EPS) : 0;
+      else n += st.surplus;
+    }
+    n += (st.cur.iters - st.cur.iter) * (step.timer_total + st.surplus);
+    return Math.max(0, Math.ceil(n - EPS));
+  }
+
+  function doneSet(state) { return new Set(state.done.map(d => d[0])); }
+
+  function runMinutes(recipe, state, now) {
+    const map = index(recipe), out = new Map();
+    for (const [id, rs] of state.run) out.set(id, minutesLeft(map[id], rs, now, state.mpm));
+    return out;
+  }
+
+  function view(recipe, state, now) {
+    const done = doneSet(state);
+    const runN = runMinutes(recipe, state, now);
+    const d = derive(recipe, done, runN);
+    const est = simulate(recipe, done, runN);
+    return Object.assign(d, { done, runN, estimate: est, whole: Math.ceil(est - EPS), left: recipe.steps.length - done.size });
+  }
+
+  function clone(state) { return JSON.parse(JSON.stringify(state)); }
+
+  const timerIds = recipe => recipe.steps.filter(isTimer).map(s => s.id);
+  const plainIds = recipe => recipe.steps.filter(s => !isTimer(s)).map(s => s.id);
+  // Every state write carries the payload's version stamp `h` and which steps were timers
+  // (`t`) and were not (`u`) at that version, so a later payload can say what changed.
+  function stamp(recipe, state) {
+    state.h = recipe.h;
+    state.t = timerIds(recipe);
+    state.u = plainIds(recipe);
+    return state;
+  }
+  function freshState(recipe, now, mpm) {
+    return stamp(recipe, { v: 2, rid: recipe.id, mpm, startedAt: now, done: [], run: [] });
+  }
+  function runEntry(step, p, started, started0) {
+    return { p, started, started0, n: step.phases.length, s: segsOf(step) };
+  }
+
+  // One tap. Untimed step: resolve. Timer step: start its first countdown. Running step:
+  // start the next countdown, or resolve after the last one (even before it rings, as
+  // the app allowed). A ring never resolves anything by itself.
+  function tap(recipe, state, sid, now) {
+    const step = index(recipe)[sid];
+    const s2 = clone(state);
+    const entry = s2.run.find(r => r[0] === sid);
+    if (entry) {
+      const rs = entry[1];
+      if (rs.p >= step.phases.length - 1) return resolve(s2, sid, now);
+      rs.p += 1;
+      rs.started = now;
+      if (rs.p % segsOf(step) === 0) rs.started0 = now;   // the next iteration starts here
+      rs.n = step.phases.length;
+      rs.s = segsOf(step);
+      return { state: s2, event: "advance" };
+    }
+    const v = view(recipe, state, now);
+    if (v.available.includes(sid)) {
+      if (isTimer(step)) {
+        s2.run.push([sid, runEntry(step, 0, now, now)]);
+        return { state: s2, event: "start" };
+      }
+      return resolve(s2, sid, now);
+    }
+    if (v.held.includes(sid)) return { state, event: "held" };
+    return { state, event: v.done.has(sid) ? "done" : "locked" };
+  }
+
+  function resolve(s2, sid, now) {
+    s2.run = s2.run.filter(r => r[0] !== sid);
+    s2.done.push([sid, now]);
+    return { state: s2, event: "resolve" };
+  }
+
+  // The letter after the id in the FOND1 line: j an export JSON, m the Markdown, l a local file.
+  function modeLetter(recipe) {
+    if (recipe.source === "local") return "l";
+    if (recipe.source === "md-steps" || recipe.source === "md-list") return "m";
+    return "j";
+  }
+
+  // Clock arithmetic on the cook's clock (local time, so a daylight-saving day counts
+  // once): the moment at hh:mm on the day of `base`, `days` calendar days later.
+  function atClock(base, hh, mm, days) {
+    const d = new Date(base);
+    if (days) d.setDate(d.getDate() + days);
+    d.setHours(hh, mm, 0, 0);
+    return d.getTime();
+  }
+  // Calendar days from the day of `from` to the day of `to`, on the cook's clock.
+  function daysAfter(from, to) { return Math.round((atClock(to, 0, 0) - atClock(from, 0, 0)) / 864e5); }
+  // A clock time in the FOND1 line: HH:MM, with `+<days>d` when it falls on a later
+  // calendar day than t= (the line's own time) — a 36-hour rest, a timer that crosses
+  // midnight — so every end reads back to the minute; a bare time lies on t='s day.
+  function lineClock(clock, now, ms) {
+    const days = daysAfter(now, ms);
+    return clock(ms) + (days > 0 ? "+" + days + "d" : "");
+  }
+  // The day, in words, beside a clock time that is not today's.
+  function dayWords(days) {
+    if (days === 1) return " tomorrow";
+    if (days > 1) return " in " + days + " days";
+    if (days === -1) return " yesterday";
+    if (days < -1) return " " + (-days) + " days ago";
+    return "";
+  }
+
+  // The line the cook pastes into the chat. Its tail is the exact replay for
+  // `plan "<id>" --done … --running … --h <h>`; the head keeps the end clock times and the
+  // countdown reached, which the replay integer alone cannot carry.
+  function stateLine(recipe, state, now, clock) {
+    const map = index(recipe);
+    const v = view(recipe, state, now);
+    const doneIds = state.done.map(d => d[0]);
+    const runs = state.run.map(([id, rs]) => {
+      const st = phaseState(map[id], rs, now, state.mpm);
+      return id + ":" + (rs.p + 1) + "/" + st.ph.length + "@" + lineClock(clock, now, st.end) + (st.rung ? "!" : "");
+    });
+    const replay = [doneIds.length ? "--done " + doneIds.join(",") : "",
+      state.run.length ? "--running " + [...v.runN].map(([id, n]) => id + "=" + n).join(",") : ""].filter(Boolean).join(" ");
+    const line = "FOND1 " + recipe.id + " " + modeLetter(recipe) + " d=" + doneIds.join(",") + " r=" + runs.join(",") +
+      " t=" + clock(now) + " h=" + recipe.h + (replay ? " | " + replay : "");
+    const words = ["Cooking " + recipe.title + " (" + recipe.id + "), " + clock(now) + " on my clock."];
+    if (doneIds.length) words.push("Done: " + doneIds.map(id => map[id].title).join(", ") + ".");
+    for (const [id, rs] of state.run) {
+      const st = phaseState(map[id], rs, now, state.mpm);
+      const part = st.ph.length > 1 ? " (" + (rs.p + 1) + " of " + st.ph.length + ")" : "";
+      words.push("Running: " + map[id].title + part + (st.rung ? ", rang at " : ", ends ") + clock(st.end) + dayWords(daysAfter(now, st.end)) + ".");
+    }
+    if (v.available.length) words.push("Next up: " + map[v.available[0]].title + ".");
+    return { words: words.join(" "), line, replay };
+  }
+
+  // A slug read as words, for a step the payload no longer carries ("toast-the-spices" →
+  // "Toast the spices"); the page has no other name for it.
+  function humanize(slug) {
+    const words = String(slug).split(/[-_]+/).filter(Boolean).join(" ");
+    return words ? words[0].toUpperCase() + words.slice(1) : String(slug);
+  }
+
+  // Reads a FOND1 line back (from Claude, or from an earlier copy). t= is the cook's clock
+  // when the line was made, taken as the nearest such moment to `now`. An end with a day
+  // offset (`@07:30+1d`) is that clock time so many calendar days after t='s day; a bare
+  // end is the first such clock time after t= (a rung '!' end: the last one at or before
+  // t=), which also reads a line from before the offset existed. A day on t= itself counts
+  // from today (the page never writes one). A line stamped with another version's h is
+  // refused; a line without h (an earlier line) is accepted. The head is read as a whole —
+  // FOND1 at the start of a word (after the start of a line or any character that is not a
+  // letter, digit or _, so a quote, `**`, a bracket, `>` or `line:` before it is fine), then
+  // exactly the fields up to t= and an optional h=, then one of: the `|` of the replay tail;
+  // a closing backtick and any prose after it (`… h=<8hex>` into the box.); or closing
+  // punctuation — quotes, `*`, a bracket, a full stop — and the end of the line. None of
+  // those endings starts with h, and a backtick right before h= is not a closing one, so a
+  // malformed stamp (`h=garbage`, seven or nine digits, upper case, `"h=garbage"`) cannot be
+  // skipped over and read as an earlier line: a present h= that is not eight lowercase hex
+  // digits refuses the whole line, naming it. (No lookbehind: older iOS Safari cannot parse
+  // one, and a parse error here would stop the whole page.)
+  const LINE_RE = /(?:^|[^A-Za-z0-9_])FOND1\s+(\S+)\s+([jml])\s+d=(\S*)\s+r=(\S*)\s+t=(\d{1,2}:\d{2})(?:\+(\d+)d)?(?:\s+h=([^\s|`"'*)\].,;:!?\u201d\u2019]*))?[^\S\r\n]*(?:\|.*|`(?![^\S\r\n]*h=).*|["'*)\].,;:!?\u201d\u2019]*)[^\S\r\n]*$/m;
+  function parseLine(recipe, text, now, mpm, base) {
+    const m = LINE_RE.exec(text || "");
+    if (!m) return { error: "Paste the whole line that starts with FOND1." };
+    if (m[7] !== undefined && !H_RE.test(m[7])) return { error: "That line's stamp h=" + m[7] + " is not eight hex digits (0-9, a-f), so nothing was applied. Paste the whole line again, or ask Claude for a new one." };
+    if (m[1] !== recipe.id) return { error: "That line is for " + m[1] + ", not " + recipe.id + "." };
+    if (m[7] && m[7] !== recipe.h) return { error: "That line is from an earlier version of this recipe. Ask Claude for a line from the current one." };
+    const map = index(recipe);
+    const ids = "This recipe's step ids: " + recipe.steps.map(s => s.id).join(", ") + ".";
+    const done = m[3] ? m[3].split(",").filter(Boolean) : [];
+    for (const id of done) if (!map[id]) return { error: "Unknown step id '" + id + "'. " + ids };
+    if (new Set(done).size !== done.length) return { error: "A step is listed twice in d=." };
+    const [th, tm] = m[5].split(":").map(Number);
+    if (th > 23 || tm > 59) return { error: "The time t=" + m[5] + " is not a clock time." };
+    let tMs;
+    if (m[6] !== undefined) tMs = atClock(now, th, tm, +m[6]);
+    else {
+      tMs = atClock(now, th, tm);
+      if (tMs - now > 12 * 3600e3) tMs -= 24 * 3600e3;
+      if (now - tMs > 12 * 3600e3) tMs += 24 * 3600e3;
+    }
+    const run = [];
+    for (const part of (m[4] ? m[4].split(",").filter(Boolean) : [])) {
+      const retired = /^([^:@]+):o@/.exec(part);
+      if (retired) return { error: "Step " + retired[1] + " is written in the retired :o@ form, which this page no longer plays. Ask Claude for a line from the current player." };
+      const r = /^(.+):(\d+)\/(\d+)@(\d{1,2}):(\d{2})(?:\+(\d+)d)?(!?)$/.exec(part);
+      if (!r || !map[r[1]]) return { error: "Could not read the running step '" + part + "'. " + ids };
+      if (done.includes(r[1])) return { error: "Step " + r[1] + " is listed as both done and running." };
+      if (run.some(x => x[0] === r[1])) return { error: "Step " + r[1] + " is listed twice." };
+      if (+r[4] > 23 || +r[5] > 59) return { error: "Step " + r[1] + " has an impossible time, " + r[4] + ":" + r[5] + "." };
+      const step = map[r[1]];
+      const p = (+r[2]) - 1;
+      if (!isTimer(step) || p < 0 || p >= step.phases.length) return { error: "Step " + r[1] + " has no countdown " + r[2] + "/" + r[3] + "." };
+      const ph = step.phases;
+      const rung = !!r[7];
+      let endMs;
+      if (r[6] !== undefined) endMs = atClock(tMs, +r[4], +r[5], +r[6]);
+      else {
+        endMs = atClock(tMs, +r[4], +r[5]);
+        if (rung) { while (endMs > tMs + 60e3) endMs -= 24 * 3600e3; }
+        else { while (endMs < tMs - 60e3) endMs += 24 * 3600e3; }
+      }
+      if (rung && endMs > now) endMs = now;
+      const started = endMs - ph[p].min * mpm;
+      // The line carries the current phase's end only: the earlier segments of this
+      // iteration are taken as having run back to back before it.
+      const segs = segsOf(step);
+      let started0 = started;
+      for (let k = p - (p % segs); k < p; k++) started0 -= ph[k].min * mpm;
+      run.push([r[1], { p, started, started0, n: ph.length, s: segs }]);
+    }
+    const runIds = run.map(r => r[0]);
+    const closed = closure(recipe, done, runIds);
+    for (const id of runIds) if (closed.has(id)) return { error: "Step " + id + " can't be running: a step that depends on it is done or running." };
+    const doneList = done.map(id => [id, now]);
+    for (const s of recipe.steps) if (closed.has(s.id) && !done.includes(s.id)) doneList.push([s.id, now]);
+    return { state: stamp(recipe, Object.assign({}, base || {}, { v: 2, rid: recipe.id, mpm, done: doneList, run })) };
+  }
+
+  // A saved or hot-restored cook that this page can play as it is: version 2, this recipe,
+  // every id known, every run index inside its step's phases. (A different `h` with the
+  // same shape is reconcile's case, not a failed fit.)
+  function fits(recipe, s) {
+    if (!s || s.v !== 2 || s.rid !== recipe.id || !Array.isArray(s.done) || !Array.isArray(s.run) || !Number.isFinite(s.mpm)) return false;
+    const m = index(recipe);
+    const ids = s.done.map(d => d && d[0]).concat(s.run.map(x => x && x[0]));
+    if (new Set(ids).size !== ids.length) return false;
+    return s.done.every(d => Array.isArray(d) && m[d[0]] && Number.isFinite(d[1])) &&
+      s.run.every(x => Array.isArray(x) && isTimer(m[x[0]]) && x[1] && Number.isFinite(x[1].started) &&
+        x[1].p >= 0 && x[1].p < m[x[0]].phases.length);
+  }
+
+  function hasStamp(recipe) { return H_RE.test(String(recipe.h || "")); }
+
+  // Reconcile by slug (recipe-authoring "The player"): a saved cook whose `h` differs from
+  // this payload's — a republish after an edit — is mapped onto the new recipe from the
+  // declared aliases only (the file's `rename`/`split` entries, never inferred). The
+  // envelope is append-only, so an old id's entry may name an id that a later entry
+  // renamed or split in turn (`rename a -> b`, then `rename b -> c`): the chain is followed
+  // to its current ids first, and only a chain that ends in a slug the recipe no longer
+  // carries counts as vanished.
+  //   D1 a done id still present stays done at its time, whatever changed
+  //   D2 a done id with a split entry is done in every child, at that time
+  //   D3 any other vanished id is dropped and named ("no longer in the recipe")
+  //   R0 a running id still present keeps its run
+  //   R1 a running id split into as many children as it had phases goes to child[p]; the
+  //      earlier children are done at the iteration's first start
+  //   R2 any other split goes to the first child that is a timer, the earlier children done;
+  //      no timer child → the run is dropped and every child is "no longer a timer"
+  //   R3 any other vanished running id is dropped and named
+  //   R4 a target that is no longer a timer leaves running ("tap it when it's done")
+  //   R5 the run keeps the moment its iteration first started and its phase index clamped:
+  //      past a reduced count= it shows rung with no minutes left (the cook taps); after the
+  //      iteration was re-cut (segments merged or split) the phase restarts from the
+  //      iteration's first start, so the minutes elapsed are never lost; otherwise p is
+  //      clamped to the new phase count and the phase start kept
+  //   C1 done entries are de-duplicated by id, the earliest time kept
+  //   C2 every prerequisite of a done or running step is implied done (as parseLine does)
+  //   C3 a running step that C2 closed is done, not running
+  // One deterministic toast reports it. A state that is not version 2 is cleared.
+  function reconcile(recipe, state, now) {
+    const cleared = { state: null, report: null, toast: "A saved cook for this recipe came from an earlier version of this page and was cleared." };
+    if (!state || state.v !== 2 || state.rid !== recipe.id || !Array.isArray(state.done) || !Array.isArray(state.run)) return cleared;
+    const map = index(recipe), aliases = recipe.aliases || {};
+    const mpm = Number.isFinite(state.mpm) ? state.mpm : 60000;
+    // An old id's current children, in the entries' order: a child that is a current step
+    // is kept; one that is itself an old id with an entry is followed; any other is a dead
+    // end. A chain that reaches no current step yields nothing, so the id is dropped and
+    // named once, like any vanished slug.
+    const kids = id => {
+      const out = [], seen = new Set();
+      const walk = x => {
+        if (seen.has(x)) return;
+        seen.add(x);
+        for (const c of (Array.isArray(aliases[x]) ? aliases[x] : [])) {
+          if (map[c]) { if (!out.includes(c)) out.push(c); }
+          else walk(c);
+        }
+      };
+      walk(id);
+      return out;
+    };
+    const report = { kept: [], running: [], mapped: [], retimed: [], nowTimer: [], notTimer: [], dropped: [] };
+    let done = [];
+    for (const [id, at] of state.done) {
+      if (!Number.isFinite(at)) continue;
+      if (map[id]) { done.push([id, at]); report.kept.push(id); continue; }                       // D1
+      const cs = kids(id);
+      if (cs.length) { for (const c of cs) done.push([c, at]); report.kept.push(id); report.mapped.push(id); continue; }  // D2
+      report.dropped.push(id);                                                                        // D3
+    }
+    const run = [];
+    for (const [id, rs] of state.run) {
+      if (!rs || !Number.isFinite(rs.started)) continue;
+      const p0 = Math.max(0, rs.p | 0);
+      const started0 = Number.isFinite(rs.started0) ? rs.started0 : rs.started;
+      let target = null, viaPhase = false;
+      if (map[id]) target = id;                                                                       // R0
+      else {
+        const cs = kids(id);
+        if (!cs.length) { report.dropped.push(id); continue; }                                        // R3
+        let k = -1;
+        if (cs.length === rs.n && isTimer(map[cs[p0]])) { k = p0; viaPhase = true; }                  // R1
+        else k = cs.findIndex(c => isTimer(map[c]));                                                  // R2
+        report.mapped.push(id);
+        if (k < 0) { for (const c of cs) report.notTimer.push(c); continue; }
+        for (const c of cs.slice(0, k)) done.push([c, started0]);
+        target = cs[k];
+      }
+      const step = map[target];
+      if (!isTimer(step)) { report.notTimer.push(target); continue; }                                  // R4
+      if (viaPhase) {
+        // The child is the phase the cook was on: it starts at that phase's own start.
+        run.push([target, runEntry(step, 0, rs.started, rs.started)]);
+        report.retimed.push(target);
+        continue;
+      }
+      const ph = step.phases;                                                                         // R5
+      const sOld = Number.isFinite(rs.s) && rs.s > 0 ? rs.s : segsOf(step);
+      const iter = Math.floor(p0 / sOld) + 1;
+      const n2 = ph.length, segs2 = segsOf(step), iters2 = Math.max(1, (step.iters | 0) || 1);
+      let p2, started2, started02;
+      if (iter > iters2) {
+        p2 = n2 - 1;
+        started2 = now - (ph[p2].min + (step.surplus || 0)) * mpm;
+        started02 = started2;
+      } else if (segs2 !== sOld) {
+        p2 = (iter - 1) * segs2;
+        started2 = started0;
+        started02 = started0;
+      } else {
+        p2 = Math.min(p0, n2 - 1);
+        started2 = rs.started;
+        started02 = started0;
+      }
+      run.push([target, { p: p2, started: started2, started0: started02, n: n2, s: segs2 }]);
+      if (n2 !== rs.n || p2 !== p0) report.retimed.push(target);
+    }
+    // What the edit did to steps the cook has not reached, from the stamp the old state
+    // carried (the timer and untimed id lists at its version).
+    const wasTimer = Array.isArray(state.t) ? new Set(state.t) : null;
+    const wasPlain = Array.isArray(state.u) ? new Set(state.u) : null;
+    const doneNow = new Set(done.map(d => d[0]));
+    // The ids a current step answered to at the old state's version: itself, and every old
+    // id whose alias chain reaches it.
+    const oldIdsOf = id => [id].concat(Object.keys(aliases).filter(k => k !== id && kids(k).includes(id)));
+    if (wasTimer && wasPlain) {
+      for (const s of recipe.steps) {
+        if (doneNow.has(s.id)) continue;
+        const olds = oldIdsOf(s.id);
+        if (isTimer(s) && olds.some(o => wasPlain.has(o))) report.nowTimer.push(s.id);
+        else if (!isTimer(s) && olds.some(o => wasTimer.has(o)) && !report.notTimer.includes(s.id)) report.notTimer.push(s.id);
+      }
+    }
+    const earliest = new Map();                                                                       // C1
+    for (const [id, at] of done) if (!earliest.has(id) || at < earliest.get(id)) earliest.set(id, at);
+    done = [...earliest].map(([id, at]) => [id, at]);
+    const doneIds = new Set(done.map(d => d[0]));                                                     // C2
+    const closed = closure(recipe, [...doneIds], run.map(r => r[0]));
+    for (const s of recipe.steps) if (closed.has(s.id) && !doneIds.has(s.id)) { done.push([s.id, now]); doneIds.add(s.id); }
+    const run2 = run.filter(([id]) => !doneIds.has(id));                                              // C3
+    report.running = run2.map(r => r[0]);
+    done.sort((a, b) => a[1] - b[1]);
+    const next = { v: 2, rid: recipe.id, mpm, done, run: run2 };
+    if (Number.isFinite(state.startedAt)) next.startedAt = state.startedAt;
+    stamp(recipe, next);
+    const title = id => (map[id] ? map[id].title : humanize(id));
+    let toast = "Recipe updated. Kept " + report.kept.length + " done, " + run2.length + " running.";
+    for (const id of report.nowTimer) toast += " " + title(id) + " is now a timer.";
+    for (const id of report.notTimer) toast += " " + title(id) + " is no longer a timer — tap it when it's done.";
+    if (report.dropped.length) toast += " Dropped: " + report.dropped.map(title).join(", ") + " (no longer in the recipe).";
+    return { state: next, report, toast };
+  }
+
+  // The paste sheet ("Pick up from Claude"): what a pasted state would take back from the
+  // current one — done steps it un-resolves and running steps it stops (a running step the
+  // line marks done is not stopped) — as the one warning the sheet shows, or "" when the
+  // line only keeps or adds progress.
+  function pasteWarning(recipe, state, next) {
+    const map = index(recipe);
+    const title = id => (map[id] ? map[id].title : humanize(id));
+    const keepDone = new Set(next.done.map(d => d[0])), keepRun = new Set(next.run.map(x => x[0]));
+    const undone = state.done.filter(d => !keepDone.has(d[0])).map(d => title(d[0]));
+    const stopped = state.run.filter(x => !keepRun.has(x[0]) && !keepDone.has(x[0])).map(x => title(x[0]));
+    if (!undone.length && !stopped.length) return "";
+    const what = [undone.length ? "undo " + undone.join(", ") : "", stopped.length ? "stop " + stopped.join(", ") : ""];
+    return "This line would " + what.filter(Boolean).join(" and ") + ". Tap Apply again to use it anyway.";
+  }
+  // The confirmation: a line that takes progress back is applied on the Apply AFTER its
+  // warning — the next press, however soon — and never without one. `armed` is whether the
+  // warning is showing for this text; the sheet disarms it when the text changes.
+  function pasteDecision(recipe, state, next, armed) {
+    const warning = pasteWarning(recipe, state, next);
+    if (!warning || armed) return { apply: true, armed: false, warning: "" };
+    return { apply: false, armed: true, warning };
+  }
+
+  return { EPS, index, fmtMinutes, prerequisites, closure, derive, simulate, phaseState, minutesLeft, doneSet, runMinutes,
+           view, tap, clone, stateLine, parseLine, modeLetter, humanize, isTimer, segsOf, timerIds, plainIds, stamp,
+           freshState, fits, hasStamp, reconcile, pasteWarning, pasteDecision, atClock, daysAfter, lineClock, dayWords };
+})();
+// ===== ENGINE END =====
+
+(function () {
+  "use strict";
+  const E = FondEngine;
+  const $ = id => document.getElementById(id);
+  const REAL = 60000, FAST = 2000;
+  const KEY = "fond-player-v2:";
+  let speed = REAL;
+  let recipe = null;
+  let state = null;
+  let undoStack = [];
+  let undoUntil = 0, undoLabel = "";
+  let rungSeen = new Map();
+  let toastTimer = null;
+  let tapGuardUntil = 0, downId = null, guardTops = null, lastTapped = null;
+  const device = { ticks: 0, maxGapMs: 0, hiddenAt: null, longestHiddenMs: 0, wake: "off", chime: "off", vibrate: ("vibrate" in navigator) ? "supported" : "not available", clipboard: "not tried" };
+  let lastTick = Date.now();
+  let audioCtx = null, chimeOn = false, wakeLock = null, wakeWanted = false;
+
+  // ---------- helpers ----------
+  const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const richText = s => esc(s).replace(/\[([^\]]+)\]/g, "<b>$1</b>");
+  const clock = ms => { const d = new Date(ms); return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0"); };
+  const mmss = ms => { const t = Math.max(0, Math.ceil(ms / 1000 - 1e-9)); return String(Math.floor(t / 60)).padStart(2, "0") + ":" + String(t % 60).padStart(2, "0"); };
+  const ordinalWord = n => (["first", "second", "third", "fourth", "fifth", "sixth"][n - 1] || n + "th");
+  const ICON = {
+    timer: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61 1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42A8.96 8.96 0 0 0 12 4a9 9 0 1 0 9 9c0-2.12-.74-4.07-1.97-5.61zM12 20a7 7 0 1 1 0-14 7 7 0 0 1 0 14z"/></svg>',
+    lock: '<svg class="ico ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>',
+    check: '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>',
+    pause: '<svg class="ico ico--sm" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>',
+  };
+  const store = {
+    get(k) { try { const v = localStorage.getItem(KEY + k); return v ? JSON.parse(v) : null; } catch (e) { return null; } },
+    set(k, v) { try { localStorage.setItem(KEY + k, JSON.stringify(v)); } catch (e) { /* storage unavailable: the cook still works for this visit */ } },
+    del(k) { try { localStorage.removeItem(KEY + k); } catch (e) { /* ignore */ } },
+  };
+
+  const hasProgress = s => !!s && Array.isArray(s.done) && Array.isArray(s.run) && (s.done.length > 0 || s.run.length > 0);
+  const finished = (r, s) => new Set(s.done.map(d => d[0])).size >= r.steps.length;
+  // The in-memory cook wins when storage is blocked.
+  const savedFor = r => (state && state.rid === r.id ? state : store.get(r.id));
+  const sourceLabel = r => r.source === "local"
+    ? ({ variant: "local variant", composed: "composed", transcribed: "transcribed" }[r.origin] || "local file")
+    : (r.source === "dsl" ? "DSL" : "legacy steps");
+
+  // A saved or hot-restored cook for this recipe: resumed as it is when its `h` is this
+  // payload's and it fits; reconciled by slug when the recipe was edited since (a different
+  // `h`), with one toast saying what was kept, retimed and dropped; cleared with one notice
+  // only when it is not a version-2 state at all.
+  function adopt(saved, onClear) {
+    const now = Date.now();
+    if (saved && saved.v === 2 && saved.h === recipe.h && E.fits(recipe, saved)) {
+      state = saved;
+      startCook("Picked up where you left off.");
+      return true;
+    }
+    if (saved && saved.v === 2 && saved.rid === recipe.id && saved.h !== recipe.h) {
+      const r = E.reconcile(recipe, saved, now);
+      if (r.state && E.fits(recipe, r.state)) {
+        state = r.state;
+        startCook(r.toast);
+        return true;
+      }
+    }
+    store.del(recipe.id);
+    state = null;
+    onClear();
+    toast("A saved cook for this recipe came from an earlier version of this page and was cleared.", false);
+    return false;
+  }
+  // The pick list's "in progress" hint uses the same test as adopt(): a version-2 state for
+  // this recipe that fits, or one a reconcile would map (never bare fits()).
+  const resumable = (r, s) => hasProgress(s) && s.v === 2 && s.rid === r.id && (s.h !== r.h || E.fits(r, s));
+
+  function timingLine(s) {
+    if (s.kind === "timer") {
+      const n = s.phases.length;
+      let t = n === 1 ? E.fmtMinutes(s.phases[0].min) + " timer" : s.structure + " · " + n + " countdowns, one at a time";
+      if (s.surplus > E.EPS) t += " · then about " + E.fmtMinutes(s.surplus) + " more" + (s.iters > 1 ? " each time" : "");
+      if (s.done_when) t += " · done when " + s.done_when;
+      return t;
+    }
+    if (s.kind === "hands-on") return "About " + E.fmtMinutes(s.scheduled) + ", hands-on";
+    if (s.kind === "cue") return "Done when " + s.done_when;
+    if (s.kind === "watch") return "About " + E.fmtMinutes(s.scheduled) + " · no timer";
+    return "";
+  }
+
+  function show(screen) {
+    for (const id of ["screen-pick", "screen-mise", "screen-cook"]) $(id).hidden = id !== screen;
+    if (screen !== "screen-cook") { undoStack = []; undoUntil = 0; $("toast").hidden = true; }
+  }
+
+  // ---------- picker ----------
+  function renderPick() {
+    document.title = "Fond Cook Player";
+    $("pick-list").innerHTML = DATA.recipes.map((r, i) => {
+      const saved = savedFor(r);
+      const resume = resumable(r, saved) ? (finished(r, saved) ? " · cooked" : " · in progress") : "";
+      return '<button class="pick__item" type="button" data-i="' + i + '"><span class="pick__inner">' +
+        '<span class="pick__name">' + esc(r.title) + "</span>" +
+        '<span class="pick__meta">' + esc(r.byline) + "</span>" +
+        '<span class="pick__meta mono">' + r.steps.length + " steps · about " + r.estimate_minutes + " min · " + esc(sourceLabel(r)) + resume + "</span>" +
+        "</span></button>";
+    }).join("");
+    show("screen-pick");
+  }
+  function fail(message) {
+    $("pick-list").innerHTML = '<p class="err" role="alert">' + esc(message) + "</p>";
+    show("screen-pick");
+  }
+  $("pick-list").addEventListener("click", e => {
+    const b = e.target.closest("[data-i]");
+    if (!b) return;
+    recipe = DATA.recipes[+b.dataset.i];
+    const saved = savedFor(recipe);
+    if (hasProgress(saved)) adopt(saved, renderMise);
+    else { state = null; renderMise(); }
+  });
+  function setSpeed(fast) {
+    speed = fast ? FAST : REAL;
+    $("speed-real").setAttribute("aria-pressed", String(!fast));
+    $("speed-fast").setAttribute("aria-pressed", String(fast));
+  }
+  $("speed-real").addEventListener("click", () => setSpeed(false));
+  $("speed-fast").addEventListener("click", () => setSpeed(true));
+
+  // ---------- mise en place ----------
+  // The provenance exactly as the skill's `show` prints it: the by-line after the title,
+  // then its lines (Source, Derived from, Credits, Changes …) one per line.
+  function provenanceHtml(r) {
+    const lines = Array.isArray(r.provenance_lines) ? r.provenance_lines.slice(1) : [];
+    return '<div class="prov"><h1>' + esc(r.title) + "</h1>" +
+      "<p>" + esc(r.byline) + "</p>" +
+      lines.map(l => '<p class="small">' + esc(String(l).replace(/^ {2}/, "")) + "</p>").join("") + "</div>";
+  }
+  function renderMise() {
+    const map = E.index(recipe);
+    const wave = recipe.wave1.map(id => map[id]).filter(Boolean);
+    document.title = recipe.title + " · Fond";
+    $("mise-body").innerHTML = provenanceHtml(recipe) +
+      '<div class="section"><h2>Ingredients</h2><ul class="ingr">' +
+      recipe.ingredients.map(i => "<li>" + esc(i) + "</li>").join("") + "</ul></div>" +
+      '<div class="section"><h2>Mise en place</h2><div class="wave">' +
+      wave.map(s => '<div class="wave__item"><h3>' + esc(s.title) + "</h3>" +
+        (s.text && s.text !== s.title ? "<p>" + richText(s.text) + "</p>" : "") + "</div>").join("") +
+      "</div></div>" +
+      '<p class="est">About <b>' + recipe.estimate_minutes + " minutes</b> to serve. That's an estimate, not a promise.</p>" +
+      '<p class="note">This page shows a countdown while it is open. It cannot ring when the page is closed, the phone is locked or the app is in the background, so set a phone or kitchen timer too.' +
+      (speed === FAST ? " <b>Fast test mode is on:</b> 1 recipe minute runs in 2 seconds." : "") + "</p>";
+    show("screen-mise");
+    $("mise-body").parentElement.scrollTop = 0;
+  }
+  $("mise-back").addEventListener("click", renderPick);
+  $("mise-start").addEventListener("click", () => {
+    undoStack = [];
+    state = E.freshState(recipe, Date.now(), speed);
+    startCook(null);
+  });
+
+  // ---------- the cook ----------
+  function startCook(message) {
+    undoStack = [];
+    rungSeen = new Map();
+    $("cook-title").textContent = recipe.title;
+    $("cook-byline").textContent = recipe.byline;
+    document.title = recipe.title + " · Fond";
+    show("screen-cook");
+    const now = Date.now();
+    // A phase already past when the cook (re)starts never chimes again.
+    for (const [id, rs] of state.run) rungSeen.set(rungKey(id, rs), E.phaseState(E.index(recipe)[id], rs, now, state.mpm).rung);
+    store.set(recipe.id, state);
+    renderCook();
+    if (message) toast(message, false);
+    scrollToFocus(false);
+  }
+
+  const rungKey = (id, rs) => id + ":" + rs.p + ":" + rs.started;
+
+  function commit(next, label) {
+    undoStack.push(state);
+    if (undoStack.length > 30) undoStack.shift();
+    // A countdown that this commit moves into the past still rings once.
+    const before = new Map(state.run);
+    for (const [id, rs] of next.run) {
+      const prev = before.get(id);
+      if (!rungSeen.has(rungKey(id, rs)) && prev && prev.p === rs.p && !E.phaseState(E.index(recipe)[id], prev, Date.now(), next.mpm).rung)
+        rungSeen.set(rungKey(id, rs), false);
+    }
+    state = next;
+    store.set(recipe.id, state);
+    tapGuardUntil = Date.now() + 450;
+    undoUntil = Date.now() + 7000;
+    undoLabel = label;
+    renderCook();
+    toast(label, true);
+    scrollToFocus(true);
+  }
+
+  function renderCook() {
+    const now = Date.now();
+    const map = E.index(recipe);
+    const v = E.view(recipe, state, now);
+    const runMap = new Map(state.run);
+    const html = [];
+    for (const [id, at] of state.done) {
+      const s = map[id];
+      html.push('<div class="tile tile--done"><div class="tile__body">' + ICON.check +
+        '<span class="tile__title"><span class="sr-only">Done: </span>' + esc(s.title) + '</span><span class="mono">' + clock(at) + "</span></div></div>");
+    }
+    const open = recipe.steps.filter(s => !v.done.has(s.id)).sort((a, b) => a.rank - b.rank);
+    const heldSet = new Set(v.held), availSet = new Set(v.available);
+    for (const s of open) {
+      if (runMap.has(s.id)) html.push(runningTile(s, runMap.get(s.id), now));
+      else if (availSet.has(s.id)) html.push(availTile(s));
+      else if (heldSet.has(s.id)) html.push(heldTile(s, v, runMap, now));
+      else html.push(lockedTile(s));
+    }
+    if (!open.length) {
+      html.push('<div class="finish"><h2>' + esc(recipe.title) + " is done</h2><p>" + esc(recipe.byline) + "</p>" +
+        '<p class="small">Every step is resolved. Tell Claude, or cook it again.</p>' +
+        '<div><button class="btn btn--quiet" type="button" id="cook-again">Cook it again</button></div></div>');
+    }
+    // Remember which step's control had focus, so a re-render keeps it.
+    const ae = document.activeElement, inList = ae && $("cook-list").contains(ae);
+    const fId = inList ? ae.dataset.id : null;
+    guardTops = new Map([...$("cook-list").querySelectorAll("[data-id]")].map(el => [el.dataset.id, el.getBoundingClientRect().top]));
+    $("cook-list").innerHTML = html.join("");
+    const back = fId ? $("cook-list").querySelector('button[data-id="' + CSS.escape(fId) + '"]') : null;
+    if (back) back.focus({ preventScroll: true });
+    updateFooter(v, now);
+  }
+
+  function availTile(s) {
+    const timing = timingLine(s);
+    return '<div class="tile tile--avail"><button class="tile__main" type="button" data-id="' + esc(s.id) + '"><span class="tile__body">' +
+      '<span class="tile__head"><span class="tile__title">' + esc(s.title) + "</span>" + (s.kind === "timer" ? ICON.timer : "") + "</span>" +
+      (s.text && s.text !== s.title ? '<span class="tile__text">' + richText(s.text) + "</span>" : "") +
+      (timing ? '<span class="tile__timing">' + esc(timing) + "</span>" : "") +
+      '<span class="sr-only">' + (s.kind === "timer" ? "Tap to start the timer." : "Tap when it's done.") + "</span>" +
+      "</span></button></div>";
+  }
+
+  function heldByText(v, runMap, now) {
+    const map = E.index(recipe);
+    return v.heldBy.map(id => {
+      const rs = runMap.get(id), st = E.phaseState(map[id], rs, now, state.mpm);
+      if (st.ph.length === 1 && !(st.surplus > E.EPS) && !st.rung) return map[id].title + " · ends " + clock(st.end) + E.dayWords(E.daysAfter(now, st.end));
+      const left = E.minutesLeft(map[id], rs, now, state.mpm);
+      return map[id].title + (left > 0 ? " · about " + left + " min more" : "");
+    }).join("; ");
+  }
+
+  function heldTile(s, v, runMap, now) {
+    const by = esc(heldByText(v, runMap, now));
+    return '<div class="tile tile--held" data-id="' + esc(s.id) + '"><div class="tile__body">' +
+      '<div class="tile__head"><span class="tile__title">' + esc(s.title) + "</span></div>" +
+      (s.text && s.text !== s.title ? '<span class="tile__text">' + richText(s.text) + "</span>" : "") +
+      '<span class="held-tag">' + ICON.pause + 'After <span data-held="1">' + by + "</span></span></div></div>";
+  }
+
+  function lockedTile(s) {
+    return '<div class="tile tile--locked" data-id="' + esc(s.id) + '" data-locked="1"><div class="tile__body">' +
+      '<div class="tile__head">' + ICON.lock + '<span class="tile__title"><span class="sr-only">Locked: </span>' + esc(s.title) + "</span></div>" +
+      (s.text && s.text !== s.title ? '<p class="peek">' + richText(s.text) + "</p>" : "") + "</div></div>";
+  }
+
+  function runningTile(s, rs, now) {
+    const st = E.phaseState(s, rs, now, state.mpm);
+    const multi = st.ph.length > 1;
+    const chips = multi ? '<span class="phases">' + st.ph.map((p, i) =>
+      '<span class="' + (i === rs.p ? "is-now" : i < rs.p ? "is-past" : "") + '">' + esc(E.fmtMinutes(p.min)) + "</span>").join("") + "</span>" : "";
+    const cue = s.done_when ? '<span class="run__cue">Done when ' + esc(s.done_when) + "</span>"
+      : (s.text && s.text !== s.title ? '<span class="run__cue">' + richText(s.text) + "</span>" : "");
+    const action = st.last ? "Tap when it's done." : "Tap to start the next countdown.";
+    return '<button class="tile tile--run' + (st.rung ? " is-rung" : "") + '" type="button" data-id="' + esc(s.id) + '" data-run="1">' +
+      '<span class="tile__body"><span class="run__title">' + esc(s.title) + "</span>" +
+      '<span class="run__count" data-count="' + esc(s.id) + '">' + mmss(st.leftMs) + "</span>" +
+      '<span class="run__meta" data-meta="' + esc(s.id) + '">' + runMeta(s, rs, st) + "</span>" +
+      chips + cue + (st.rung ? '<span class="run__next" data-next="' + esc(s.id) + '">' + esc(hintText(st)) + "</span>" : "") +
+      (st.rung ? "" : '<span class="sr-only">' + action + "</span>") + "</span></button>";
+  }
+
+  function runMeta(s, rs, st) {
+    const bits = [];
+    const multi = st.ph.length > 1;
+    if (multi) {
+      if (st.cur.iters > 1 && st.cur.segs === 1) bits.push(ordinalWord(st.cur.iter).replace(/^./, c => c.toUpperCase()) + " of " + st.cur.iters);
+      else if (st.cur.iters === 1) bits.push("Part " + st.cur.seg + " of " + st.cur.segs);
+      else bits.push("Round " + st.cur.iter + " of " + st.cur.iters + ", part " + st.cur.seg + " of " + st.cur.segs);
+    }
+    bits.push((st.rung ? "rang at " : "ends ") + clock(st.end) + E.dayWords(E.daysAfter(st.end - st.leftMs, st.end)));
+    return esc(bits.join(" · "));
+  }
+
+  // What the cook does after a ring. A DSL surplus keeps the step open for its extra minutes.
+  function hintText(st) {
+    if (st.lastOfIter && st.surplusLeftMs > 0) {
+      const n = Math.max(1, Math.ceil(st.surplusLeftMs / state.mpm - E.EPS));
+      return "Rang. About " + n + " more min on this step" + (st.last ? ", then tap when it's done" : ", then tap for the next one");
+    }
+    if (!st.last) return "Rang. Tap to start the next " + E.fmtMinutes(st.next.min);
+    return "Rang. Tap when it's done";
+  }
+
+  function updateFooter(v, now) {
+    const left = recipe.steps.length - v.done.size;
+    if (!left) {
+      $("foot-serve").textContent = "Done";
+      $("foot-left").textContent = recipe.steps.length + " of " + recipe.steps.length + " steps";
+      return;
+    }
+    $("foot-serve").textContent = "Serve about " + clock(now + v.estimate * state.mpm);
+    $("foot-left").textContent = "About " + v.whole + " min to go · " + left + " of " + recipe.steps.length + " steps left" + (state.mpm === FAST ? " · fast test" : "");
+  }
+
+  // ---------- taps ----------
+  $("cook-list").addEventListener("click", e => {
+    if (e.target.closest("#cook-again")) {
+      store.del(recipe.id);
+      state = null;
+      undoStack = [];
+      undoUntil = 0;
+      $("toast").hidden = true;
+      renderMise();
+      return;
+    }
+    // A second tap right after a re-render or auto-scroll would land on a different step.
+    // Keyboard and switch activations (e.detail === 0) have no pointerdown to compare with.
+    const hit = e.target.closest("[data-id]");
+    const hitId = hit ? hit.dataset.id : null;
+    const pressed = downId;
+    downId = null;
+    if (e.detail > 0 && pressed !== null && hitId !== pressed) return;
+    if (Date.now() < tapGuardUntil) {
+      const before = guardTops && hitId ? guardTops.get(hitId) : undefined;
+      const still = hit && before !== undefined && Math.abs(hit.getBoundingClientRect().top - before) < 4;
+      if (!still || hitId === lastTapped) return;
+    }
+    lastTapped = hitId;
+    const now = Date.now();
+    const tile = e.target.closest("[data-id]");
+    if (!tile || tile.dataset.locked) return;
+    const id = tile.dataset.id;
+    const step = E.index(recipe)[id];
+    const r = E.tap(recipe, state, id, now);
+    if (r.event === "held") {
+      const v = E.view(recipe, state, now);
+      toast("Held until " + v.heldBy.map(h => E.index(recipe)[h].title).join(" and ") + " is done.", false);
+      return;
+    }
+    if (r.event === "resolve") commit(r.state, "Done: " + step.title + ".");
+    else if (r.event === "start") commit(r.state, "Started " + step.title + ".");
+    else if (r.event === "advance") commit(r.state, "Next countdown for " + step.title + ".");
+  });
+
+  // Press and hold a locked tile to read it, like the app.
+  let peekEl = null, peekTimer = null;
+  function endPeek() {
+    clearTimeout(peekTimer);
+    if (peekEl) peekEl.classList.remove("is-peek");
+    peekEl = null;
+  }
+  $("cook-list").addEventListener("pointerdown", e => {
+    endPeek();
+    if (!e.isPrimary) return;
+    const hit = e.target.closest("[data-id]");
+    downId = hit ? hit.dataset.id : null;
+    const t = e.target.closest("[data-locked]");
+    if (!t) return;
+    peekTimer = setTimeout(() => {
+      peekEl = t;
+      t.classList.add("is-peek");
+      try { if (navigator.vibrate) navigator.vibrate(12); } catch (err) { /* not allowed here */ }
+    }, 120);
+  });
+  for (const ev of ["pointerup", "pointercancel", "pointerleave"]) $("cook-list").addEventListener(ev, endPeek);
+  $("cook-list").addEventListener("contextmenu", e => { if (e.target.closest("[data-locked]")) e.preventDefault(); });
+
+  function scrollToFocus(smooth) {
+    const runEl = $("cook-list").querySelector("[data-run]");
+    const target = runEl || $("cook-list").querySelector(".tile--avail, .tile--held, .tile--locked");
+    if (!target) return;
+    const box = $("cook-scroll");
+    const top = target.offsetTop - box.offsetTop - 10;
+    try { box.scrollTo({ top: Math.max(0, top), behavior: smooth && !matchMedia("(prefers-reduced-motion: reduce)").matches ? "smooth" : "auto" }); }
+    catch (e) { box.scrollTop = Math.max(0, top); }
+  }
+
+  // ---------- the tick: countdowns from wall-clock end times, never from tick counts ----------
+  function tick() {
+    const now = Date.now();
+    const gap = now - lastTick;
+    lastTick = now;
+    device.ticks += 1;
+    if (gap > device.maxGapMs) device.maxGapMs = gap;
+    if (!recipe || !state || $("screen-cook").hidden) return;
+    const map = E.index(recipe);
+    let needRender = false;
+    for (const [id, rs] of state.run) {
+      const st = E.phaseState(map[id], rs, now, state.mpm);
+      const el = document.querySelector('[data-count="' + CSS.escape(id) + '"]');
+      if (el) el.textContent = mmss(st.leftMs);
+      const key = rungKey(id, rs);
+      if (st.rung && rungSeen.get(key) === false) { ring(map[id]); needRender = true; }
+      if (!rungSeen.has(key) || st.rung) rungSeen.set(key, st.rung);
+      if (st.rung) {
+        const nx = document.querySelector('[data-next="' + CSS.escape(id) + '"]');
+        const txt = hintText(st);
+        if (!nx) needRender = true;
+        else if (nx.textContent !== txt) nx.textContent = txt;
+      }
+    }
+    if (needRender) { tapGuardUntil = Date.now() + 450; renderCook(); return; }
+    const v = E.view(recipe, state, now);
+    const held = document.querySelectorAll("[data-held]");
+    if (held.length) {
+      const t = heldByText(v, new Map(state.run), now);
+      for (const el of held) if (el.textContent !== t) el.textContent = t;
+    }
+    updateFooter(v, now);
+  }
+  setInterval(tick, 250);
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) device.hiddenAt = Date.now();
+    else {
+      if (device.hiddenAt) device.longestHiddenMs = Math.max(device.longestHiddenMs, Date.now() - device.hiddenAt);
+      device.hiddenAt = null;
+      if (wakeWanted) requestWake();
+      refreshSyncText();
+      tick();
+    }
+  });
+
+  // ---------- ring: visual always; chime and vibration best-effort while the page is open ----------
+  function ring(step) {
+    toast(step.title + ": timer rang.", false);
+    if (chimeOn && audioCtx) {
+      try {
+        if (audioCtx.state !== "running") { device.chime = "blocked (" + audioCtx.state + ")"; return; }
+        const t0 = audioCtx.currentTime;
+        for (const [i, f] of [[0, 880], [1, 660], [2, 880]]) {
+          const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+          o.type = "sine"; o.frequency.value = f;
+          g.gain.setValueAtTime(0.0001, t0 + i * 0.32);
+          g.gain.linearRampToValueAtTime(0.35, t0 + i * 0.32 + 0.02);
+          g.gain.linearRampToValueAtTime(0.0001, t0 + i * 0.32 + 0.28);
+          o.connect(g).connect(audioCtx.destination);
+          o.start(t0 + i * 0.32); o.stop(t0 + i * 0.32 + 0.3);
+        }
+        device.chime = "played at " + clock(Date.now()) + (document.hidden ? " (page hidden)" : "");
+      } catch (e) { device.chime = "failed: " + e.name; }
+    }
+    try { if (navigator.vibrate && navigator.vibrate([200, 100, 200])) device.vibrate = "vibrated at " + clock(Date.now()); } catch (e) { device.vibrate = "refused"; }
+  }
+
+  async function requestWake() {
+    if (!("wakeLock" in navigator)) { device.wake = "not available"; return; }
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      device.wake = "held";
+      wakeLock.addEventListener("release", () => { device.wake = wakeWanted ? "released by the system" : "off"; });
+    } catch (e) { device.wake = "refused: " + e.name; }
+  }
+
+  function syncText(now) {
+    const s = E.stateLine(recipe, state, now, clock);
+    if (state.mpm === FAST) s.words += " (Fast test mode: minutes ran 30 times faster.)";
+    return s.words + "\n" + s.line;
+  }
+  function refreshSyncText() {
+    const el = $("sync-text");
+    if (!el || !recipe || !state) return;
+    const text = syncText(Date.now());
+    if (el.textContent !== text) el.textContent = text;
+  }
+
+  function openSync() {
+    $("toast").hidden = true;
+    const now = Date.now();
+    $("layer").innerHTML =
+      '<div class="sheet-wrap" id="sheet-wrap"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sync-h">' +
+      '<div class="sheet__row" style="justify-content:space-between"><h2 id="sync-h">Tell Claude where you are</h2><button class="btn btn--quiet" type="button" id="sync-close">Close</button></div>' +
+      "<p>Copy this and paste it into your chat. Claude replays the last part with the skill's <span class=\"mono\">plan</span> command and answers from there.</p>" +
+      '<pre class="codebox" id="sync-text">' + esc(syncText(now)) + "</pre>" +
+      '<div class="sheet__row"><button class="btn" type="button" id="sync-copy">Copy</button><span class="small muted" id="sync-copied" role="status"></span></div>' +
+      "<h3>Pick up from Claude</h3><p>If you told Claude about a step instead of tapping it, ask Claude for a FOND1 line and paste it here.</p>" +
+      '<textarea class="codebox" id="sync-in" placeholder="FOND1 ' + esc(recipe.id) + " " + E.modeLetter(recipe) + ' d=… r=… t=… h=…"></textarea>' +
+      '<div class="sheet__row"><button class="btn btn--quiet" type="button" id="sync-apply">Apply</button></div><p class="err" id="sync-err" role="alert"></p>' +
+      "</div></div>";
+    $("sync-close").onclick = closeSheet;
+    $("sheet-wrap").onclick = e => { if (e.target.id === "sheet-wrap") closeSheet(); };
+    $("sync-copy").onclick = () => {
+      const text = syncText(Date.now());
+      $("sync-text").textContent = text;
+      const fallback = () => {
+        const r = document.createRange(); r.selectNodeContents($("sync-text"));
+        const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+        $("sync-copied").textContent = "Selected. Use your phone's Copy.";
+        device.clipboard = "refused, selected instead";
+      };
+      try {
+        navigator.clipboard.writeText(text).then(() => { $("sync-copied").textContent = "Copied."; device.clipboard = "works"; }, fallback);
+      } catch (e) { fallback(); }
+    };
+    // The confirmation is the engine's (E.pasteDecision): `data-armed` on Apply says the
+    // warning is showing for the current text, and editing the text disarms it.
+    $("sync-in").oninput = () => { $("sync-apply").dataset.armed = ""; $("sync-err").textContent = ""; };
+    $("sync-apply").onclick = () => {
+      const now2 = Date.now();
+      const r = E.parseLine(recipe, $("sync-in").value, now2, state.mpm, { startedAt: state.startedAt });
+      if (r.error) { $("sync-err").textContent = r.error; return; }
+      const map = E.index(recipe);
+      // A line that would un-resolve done steps or stop running ones is warned about once;
+      // the next Apply — however soon — uses it.
+      const d = E.pasteDecision(recipe, state, r.state, $("sync-apply").dataset.armed === "1");
+      $("sync-apply").dataset.armed = d.armed ? "1" : "";
+      if (!d.apply) { $("sync-err").textContent = d.warning; return; }
+      // Keep the real completion times, and keep a running countdown whose end the line
+      // only repeats to the minute.
+      const prior = new Map(state.done);
+      r.state.done = r.state.done.map(([id, at]) => [id, prior.has(id) ? prior.get(id) : at]).sort((a, b) => a[1] - b[1]);
+      for (const e of r.state.run) {
+        const o = state.run.find(x => x[0] === e[0]);
+        if (o && o[1].p === e[1].p &&
+            clock(E.phaseState(map[e[0]], o[1], now2, state.mpm).end) === clock(E.phaseState(map[e[0]], e[1], now2, state.mpm).end)) e[1] = o[1];
+      }
+      closeSheet();
+      commit(r.state, "Picked up the state from Claude.");
+    };
+  }
+  $("cook-sync").addEventListener("click", openSync);
+
+  function openMenu() {
+    $("toast").hidden = true;
+    const report = [
+      ["JavaScript ticks", device.ticks],
+      ["Longest gap between ticks", (device.maxGapMs / 1000).toFixed(1) + " s"],
+      ["Longest time hidden", (device.longestHiddenMs / 1000).toFixed(1) + " s"],
+      ["Keep screen on", device.wake],
+      ["Chime", device.chime],
+      ["Vibration", device.vibrate],
+      ["Clipboard", device.clipboard],
+      ["Local storage", (() => { try { localStorage.setItem(KEY + "probe", "1"); localStorage.removeItem(KEY + "probe"); return "works"; } catch (e) { return "blocked"; } })()],
+    ];
+    $("layer").innerHTML =
+      '<div class="sheet-wrap" id="sheet-wrap"><div class="sheet" role="dialog" aria-modal="true" aria-labelledby="menu-h">' +
+      '<div class="sheet__row" style="justify-content:space-between"><h2 id="menu-h">Cook options</h2><button class="btn btn--quiet" type="button" id="menu-close">Close</button></div>' +
+      "<h3>What this browser allows — shown here, never sent</h3><p>A ring is always shown on the step. The chime and vibration are best-effort while this page is open and may be blocked; nothing rings once the page is closed. These readings are kept on this page only.</p>" +
+      '<label class="check"><input type="checkbox" id="opt-chime"' + (chimeOn ? " checked" : "") + "> Chime when a timer rings</label>" +
+      '<label class="check"><input type="checkbox" id="opt-wake"' + (wakeWanted ? " checked" : "") + "> Keep the screen on</label>" +
+      '<ul class="report">' + report.map(([k, v]) => "<li><span>" + esc(k) + "</span><span>" + esc(v) + "</span></li>").join("") + "</ul>" +
+      "<h3>Stop</h3>" +
+      '<div class="sheet__row"><button class="btn btn--quiet" type="button" id="menu-recipes">Back to recipes</button><button class="btn btn--quiet" type="button" id="menu-stop">Stop and clear this cook</button></div>' +
+      '<p class="small muted" id="menu-confirm" hidden>Clearing removes this cook\'s progress from this page. <button class="link" type="button" id="menu-stop-yes">Clear it</button></p>' +
+      "</div></div>";
+    $("menu-close").onclick = closeSheet;
+    $("sheet-wrap").onclick = e => { if (e.target.id === "sheet-wrap") closeSheet(); };
+    $("opt-chime").onchange = e => {
+      chimeOn = e.target.checked;
+      if (chimeOn) {
+        try {
+          audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+          audioCtx.resume().then(() => { device.chime = "ready (" + audioCtx.state + ")"; }, err => { device.chime = "refused: " + err.name; });
+        } catch (err) { device.chime = "not available"; }
+      } else device.chime = "off";
+    };
+    $("opt-wake").onchange = e => {
+      wakeWanted = e.target.checked;
+      if (wakeWanted) requestWake();
+      else { try { if (wakeLock) wakeLock.release(); } catch (err) { /* ignore */ } wakeLock = null; device.wake = "off"; }
+    };
+    $("menu-recipes").onclick = () => { closeSheet(); renderPick(); };
+    $("menu-stop").onclick = () => { $("menu-confirm").hidden = false; };
+    $("menu-stop-yes").onclick = () => { store.del(recipe.id); state = null; undoStack = []; closeSheet(); renderPick(); };
+  }
+  $("cook-menu").addEventListener("click", openMenu);
+  function closeSheet() { $("layer").innerHTML = ""; }
+
+  // ---------- toast with undo ----------
+  // Undo stays on offer for 7 s after a tap, even if another message replaces the toast.
+  function toast(text, undoable) {
+    const live = undoStack.length > 0 && !$("screen-cook").hidden && (undoable || Date.now() < undoUntil);
+    $("toast-text").textContent = text;
+    $("toast-undo").textContent = undoable || !live ? "Undo" : "Undo last tap";
+    $("toast-undo").setAttribute("aria-label", live && !undoable ? "Undo: " + undoLabel.replace(/\.$/, "") : "Undo");
+    $("toast-undo").hidden = !live;
+    $("toast").hidden = false;
+    $("sr-status").textContent = text;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { $("toast").hidden = true; }, Math.max(undoable ? 7000 : 3500, live ? undoUntil - Date.now() : 0));
+  }
+  $("toast-undo").addEventListener("click", () => {
+    if (!undoStack.length) return;
+    state = undoStack.pop();
+    store.set(recipe.id, state);
+    undoUntil = 0;
+    tapGuardUntil = Date.now() + 450;
+    renderCook();
+    $("toast").hidden = true;
+    $("sr-status").textContent = "Undone.";
+  });
+
+  // ---------- boot ----------
+  // Every payload row must carry its version stamp `h`; a page without one is rebuilt, not played.
+  function boot(hot) {
+    if (!DATA || !Array.isArray(DATA.recipes) || !DATA.recipes.length) { fail("This page carries no recipe. Rebuild this page with the skill's player command."); return; }
+    if (!DATA.recipes.every(E.hasStamp)) { fail("This page's recipe data carries no version stamp (h). Rebuild this page with the skill's player command."); return; }
+    if (hot && hot.rid && hot.state && hot.state.rid === hot.rid) {
+      const r = DATA.recipes.find(x => x.id === hot.rid) || null;
+      if (r) { recipe = r; if (adopt(hot.state, renderPick)) return; return; }
+    }
+    renderPick();
+  }
+  if (window.claude && window.claude.hot && window.claude.hot.snapshot) {
+    window.claude.hot.snapshot(() => (state ? { rid: state.rid, state } : {}));
+  }
+  if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(boot);
+  else boot((window.claude && window.claude.hot && window.claude.hot.data) || {});
+})();
+</script>
